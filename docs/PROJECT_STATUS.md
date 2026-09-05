@@ -218,6 +218,21 @@ point-exact up to grid quantization, so they are not affected by the sampling
 gap; the blocked-split and generality matrices used `path_validity_gate`
 under the ideal model and are likewise unaffected.
 
+## Space-time topology Phase 0 (2026-09-05)
+
+Started as a background investment (roughly an hour or two a day, alongside
+report writing and the Nav2 port), not a green-light item. `spacetime.py`
+implements a standalone time-expanded `(x, y, t)` Dijkstra search plus a
+synchronized-time distinctness test (the temporal analogue of `homotopy.py`'s
+side test), validated on synthetic scenarios only -- not yet wired into
+`LocalFlowField`/`pseudopods.py`/`mppi.py`. Found and fixed two real bugs
+before they shipped: a deadline-based "two route" construction that silently
+degenerates to one dominant strategy (replaced with a wait-cost-variation
+construction, verified empirically to produce genuine wait-vs-detour
+routes), and a search grid sized only around the start position that
+silently clips a distant goal instead of erroring. 13 new tests, 82/82
+overall. See `docs/experiments/SPACETIME_TOPOLOGY_PHASE0.md`.
+
 ## Homotopy-consistency cost and horizon-scale distinctness (2026-09-04)
 
 A T-MPC-style mode-purity cost (de Groot et al., RA-L; `homotopy.py`,
