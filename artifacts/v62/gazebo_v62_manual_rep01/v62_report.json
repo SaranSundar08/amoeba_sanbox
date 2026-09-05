@@ -1,0 +1,18 @@
+{
+  "duration_s": 33.900000000000006,
+  "command_messages": 403,
+  "odometry_messages": 55972,
+  "analysis_rate_hz": 50.0,
+  "linear_delay_s": 0.09,
+  "angular_delay_s": 0.21,
+  "linear_gain": 0.9999388408319312,
+  "linear_steady_mae_mps": 0.0002333626754898177,
+  "in_place_yaw_gain": 0.7590256317783031,
+  "angular_steady_mae_radps": 0.24097436822169693,
+  "linear_accel_p95_mps2": 1.1518475230319127,
+  "angular_accel_p95_radps2": 1.5303950445216765,
+  "stop_events": 10,
+  "median_stopping_distance_m": 0.034093437446989235,
+  "simultaneous_turn_samples": 245,
+  "speed_yaw_loss_identifiable": true
+}

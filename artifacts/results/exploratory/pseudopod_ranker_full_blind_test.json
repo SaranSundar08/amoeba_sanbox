@@ -1,0 +1,31 @@
+{
+  "snapshots": 459,
+  "top1_accuracy": 0.8431372549019608,
+  "heuristic_top1_accuracy": 0.7799564270152506,
+  "mean_regret": 0.01558832561268526,
+  "heuristic_mean_regret": 0.3768312894700659,
+  "selected_collision_fraction": 0.0196078431372549,
+  "heuristic_collision_fraction": 0.034858387799564274,
+  "avoidable_selected_collision_fraction": 0.0,
+  "avoidable_heuristic_collision_fraction": 0.015250544662309368,
+  "test_worlds": [
+    50,
+    51,
+    52,
+    53,
+    54,
+    56,
+    57,
+    58,
+    60,
+    61,
+    64,
+    65,
+    67,
+    68,
+    81,
+    89,
+    98
+  ],
+  "risk_beta": 20.0
+}

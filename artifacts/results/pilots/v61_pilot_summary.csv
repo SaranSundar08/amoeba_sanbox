@@ -1,0 +1,3 @@
+config,runs,successes,success_rate,collisions,timeouts,mean_time_success_s,mean_path_success_m,mean_clearance_m,worst_clearance_m,mean_stall_s,mean_controller_hz,mean_ess,mean_mode_switches,mean_path_error_m
+current,2,0,0.0,1,1,nan,nan,0.072,-0.003,0.225,17.121499999999997,16.47309849460309,7.5,0.29369999999999996
+predicted,2,0,0.0,0,2,nan,nan,0.2375,0.169,0.05,17.277,15.353270602890635,8.5,0.36634999999999995

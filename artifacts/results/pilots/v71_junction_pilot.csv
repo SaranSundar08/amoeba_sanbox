@@ -1,0 +1,10 @@
+scenario,config,seed,result,success,peer_collision,static_collision,time_s,path_length_m,minimum_peer_clearance_m,minimum_static_clearance_m,stall_time_s,final_goal_distance_m,assist_fraction,branch_fraction,mode_switches,wall_time_s,controller_hz
+crossing,vanilla,0,success,1,0,0,17.8,6.079,0.3501,0.375,0.0,0.3451,0.0,0.0,0,0.883,403.248
+crossing,path,0,success,1,0,0,18.1,6.066,0.3849,0.425,0.0,0.3431,0.0,0.0,0,7.331,49.383
+crossing,amoeba,0,success,1,0,0,16.7,6.1681,0.1479,0.2297,0.4,0.3411,0.1467065868263473,0.08383233532934131,4,13.855,24.107
+head_on,vanilla,0,peer_collision,0,1,0,12.4,4.1347,-0.0019,0.0,0.5,6.8049,0.0,0.0,0,0.613,404.322
+head_on,path,0,static_collision,0,0,1,12.55,4.1259,0.0077,-0.0,0.35,6.9095,0.0,0.0,0,5.247,47.837
+head_on,amoeba,0,peer_collision,0,1,0,12.6,4.8677,-0.001,-0.025,0.5,6.9308,1.0,0.3134920634920635,5,9.576,26.315
+merge,vanilla,0,success,1,0,0,17.85,6.0825,0.5088,0.35,0.0,0.3423,0.0,0.0,0,0.942,379.004
+merge,path,0,success,1,0,0,18.1,6.0656,0.5406,0.425,0.0,0.3438,0.0,0.0,0,7.21,50.211
+merge,amoeba,0,success,1,0,0,18.25,6.4266,0.2975,0.2551,0.1,0.3407,0.43561643835616437,0.10684931506849316,3,14.467,25.23

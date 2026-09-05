@@ -1,0 +1,4 @@
+scenario,config,runs,successes,success_rate,peer_collisions,static_collisions,timeouts,mean_success_time_s,mean_peer_clearance_m,worst_peer_clearance_m,mean_stall_time_s,mean_branch_fraction,mean_controller_hz
+blocked_split,vanilla,1,0,0.0,0,1,0,nan,0.7705,0.7705,5.15,0.0,14.897
+blocked_split,path,1,0,0.0,1,0,0,nan,-0.0009,-0.0009,6.05,0.0,8.145
+blocked_split,amoeba,1,1,1.0,0,0,0,29.25,0.7257,0.7257,5.4,0.4905982905982906,6.831

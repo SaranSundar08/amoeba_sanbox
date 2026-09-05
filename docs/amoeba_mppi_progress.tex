@@ -1,0 +1,1430 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=2.3cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{enumitem}
+\usepackage{array}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!55!black,
+  urlcolor=blue!55!black
+}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  frame=single,
+  breaklines=true,
+  columns=fullflexible,
+  backgroundcolor=\color{gray!5}
+}
+
+\newcommand{\code}[1]{\texttt{\detokenize{#1}}}
+\newcommand{\vect}[1]{\boldsymbol{#1}}
+\newcommand{\Normal}{\mathcal{N}}
+
+\title{Topology-Informed Multimodal MPPI for SLIP\\
+\large Sandbox and Nav2 Implementation Progress: V0--V8}
+\author{MSc thesis development notes}
+\date{\today}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Purpose of this document}
+
+This document records what has been implemented in the Python/NumPy sandbox,
+the independent PyTorch port, and the ROS~2 Nav2 C++ integration. It explains
+why each version was introduced, how the pieces interact, and what remains
+before deployment on the physical SLIP robot.
+
+The present contribution is not merely a geodesic gradient that shifts one
+Gaussian. The intended contribution is:
+
+\begin{quote}
+A topology-informed multimodal proposal generator for MPPI that maps distinct
+local free-space branches into dynamically feasible, geometry-adaptive control
+distributions.
+\end{quote}
+
+The sandbox implements V0 through V7.2, including static and dynamic
+benchmarks and an independent PyTorch execution path. V6 remains an
+analytical, configurable SLIP prototype rather than a calibrated hardware
+model. The Nav2 C++ port has reached V8 Phase~3: the controller constructs a
+finite geodesic body, extracts up to three pseudopods, converts them into
+time-varying ancillary control sequences, and injects promise-weighted sample
+groups into Nav2 MPPI. Physical parameter identification, collision validation
+of the ancillary rollouts, asynchronous field reconstruction, and disciplined
+Gazebo/robot benchmarks remain open.
+
+\section{Robot and deployment context}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{>{\bfseries}p{0.34\linewidth}p{0.56\linewidth}}
+\toprule
+Platform & SLIP, approximately 70\,kg skid-steer mobile robot \\
+Software & ROS~2 Humble, Ubuntu 22.04, Nav2 \\
+Compute & NVIDIA Jetson Orin Nano \\
+Localization & RoboSense Airy 3D LiDAR with FAST-LIO2 \\
+Command interface & Differential-drive $(v,\omega)$ velocity command \\
+Physical behavior & Skid steer, therefore turning and slip differ from an
+ideal differential-drive model \\
+Typical MPPI configuration & $T=56$, $\Delta t=0.05$\,s, batch size near 2000 \\
+Environment & Narrow, cluttered, scaffold and construction-like spaces \\
+\bottomrule
+\end{tabular}
+\caption{Target deployment context.}
+\end{table}
+
+\section{System overview}
+
+The implemented data flow is:
+
+\begin{center}
+\fbox{\parbox{0.91\linewidth}{
+\centering
+costmap/obstacles $\rightarrow$ local geodesic body
+$\rightarrow$ pseudopod branches (V1)
+$\rightarrow$ branch control means (V2)
+$\rightarrow$ grouped mixture proposals (V3)
+$\rightarrow$ corrected mixture weights (V4)
+$\rightarrow$ ESS guard (V4.1)
+$\rightarrow$ geometry-adaptive covariance (V5)
+$\rightarrow$ footprint/skid-steer feasibility (V6)
+$\rightarrow$ committed MPPI mode
+$\rightarrow [v,\omega]$
+
+\medskip
+The global A* path supplies a protected fallback proposal and normal-navigation
+reference. It is not replaced by the pseudopods.
+}}
+\end{center}
+
+Three controllers are publicly selectable:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{p{0.18\linewidth}p{0.72\linewidth}}
+\toprule
+\textbf{Name} & \textbf{Role} \\
+\midrule
+\code{vanilla} & Standard single-distribution MPPI baseline. \\
+\code{local} & Local geodesic-body guidance with optional pseudopod extraction
+and grouped sampling. \\
+\code{hybrid} & Global-path tracking plus gated local assistance. This is the
+closest sandbox analogue of the intended Nav2 behavior. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Earlier ray, full-map flow, and waypoint-commit variants were removed from the
+runnable API. Their useful lessons remain in the local/hybrid design, while
+their old figures are preserved under \code{artifacts/images/legacy}.
+
+\section{MPPI baseline}
+
+Let a control sequence be
+\begin{equation}
+  U = [u_0,\ldots,u_{T-1}], \qquad u_t = [v_t,\omega_t]^\top.
+\end{equation}
+For the sandbox prediction model,
+\begin{align}
+  \theta_{t+1} &= \theta_t + \omega_t\Delta t,\\
+  x_{t+1} &= x_t + v_t\cos(\theta_{t+1})\Delta t,\\
+  y_{t+1} &= y_t + v_t\sin(\theta_{t+1})\Delta t.
+\end{align}
+
+The trajectory cost contains collision, footprint-clearance repulsion, and
+goal/path/geodesic terms:
+\begin{equation}
+  S(U) = S_{\mathrm{collision}} + S_{\mathrm{clearance}}
+       + S_{\mathrm{navigation}}.
+\end{equation}
+Vanilla MPPI forms weights
+\begin{equation}
+  w_k =
+  \frac{\exp[-(S_k-S_{\min})/\lambda]}
+       {\sum_j\exp[-(S_j-S_{\min})/\lambda]}
+\end{equation}
+and updates the nominal sequence using the weighted sampled controls.
+
+\section{Version history}
+
+\subsection{V0: local geodesic-field-guided MPPI}
+
+V0 constructs a local ``amoeba body'' with two floods:
+
+\begin{enumerate}[leftmargin=*]
+  \item An unweighted, radius-limited flood from the robot defines reachable
+  free cells. This is the body's shape.
+  \item A viscosity/obstacle-weighted navigation flood inside that body defines
+  a cost-to-go field.
+\end{enumerate}
+
+The field influences MPPI through a steering bias and a geodesic trajectory
+cost. The field is rebuilt every few controller cycles. Reachability and
+viscosity are deliberately separate: viscosity is a route preference, not a
+sensing-range definition.
+
+V0 is useful guidance, but it still describes one proposal distribution and
+therefore does not preserve explicit left/right route alternatives.
+
+\subsection{V1: topology-separated pseudopod extraction}
+
+V1 extracts up to three branches from the local body's actual reachable
+frontier:
+
+\begin{enumerate}[leftmargin=*]
+  \item Rank promising frontier cells using reach and navigation promise.
+  \item Apply spatial suppression to avoid many nearby candidates.
+  \item Trace each candidate back toward the robot through the reach field.
+  \item Reject geometrically equivalent centrelines.
+  \item Retain separate branches only when they genuinely diverge around dry
+  or obstructed space.
+  \item Match branch identities between field rebuilds using
+  \code{BranchTracker}.
+\end{enumerate}
+
+The result is a collection of explicit objects $P_0,P_1,P_2$, each with an
+endpoint, centreline, score, and stable ID. Open space intentionally collapses
+to one geometric branch; a pillar can produce left and right branches.
+
+\subsection{V2: branch-to-control-sequence conversion}
+
+Each centreline is converted into a full $[T,2]$ mean sequence:
+\begin{equation}
+  \mu_m = [u_{m,0},\ldots,u_{m,T-1}], \qquad
+  u_{m,t}=[v_{m,t},\omega_{m,t}]^\top.
+\end{equation}
+
+The converter uses receding lookahead, heading error, curvature feed-forward,
+clearance-aware speed reduction, and the sandbox's velocity and acceleration
+limits. Every proposal is rolled through the same dynamics used by MPPI.
+It reports feasibility, minimum clearance, progress, and tracking error.
+Infeasible branches are not promoted into active sampling modes.
+
+\subsection{V3: fixed grouped multimodal sampling}
+
+V3 forms the proposal family
+\begin{equation}
+  q(U) = \sum_{m=1}^{M}\pi_m
+  \Normal(U;\mu_m,\Sigma_m).
+\end{equation}
+At this stage $\Sigma_m$ uses the same fixed diagonal standard deviations for
+all modes. A deterministic fraction of the batch is assigned to each feasible
+pseudopod and to an always-present fallback. Samples retain their mode labels
+through rollout and scoring.
+
+Only the selected mode's controls are averaged for the output update. This is
+important: directly averaging good left-route and right-route control
+sequences may generate a bad trajectory through the obstacle between them.
+V3 uses uncorrected within-mode MPPI weights and is retained as an ablation
+baseline.
+
+It is also the weighting rule frozen for the final thesis benchmark. With
+$M_k$ active pseudopods, the protected A* fallback receives
+$\pi_0=0.25$ of the batch and each pseudopod receives
+$\pi_m=0.75/M_k$. If no pseudopod is exposed, the fallback receives the full
+batch. For mode $m$, weights are normalized only over samples carrying its
+label,
+\begin{equation}
+  w_{i\mid m}=\frac{\exp[-(S_i-S_{m,\min})/\lambda]}
+  {\sum_{j:z_j=m}\exp[-(S_j-S_{m,\min})/\lambda]},
+\end{equation}
+and only the committed mode $m^*$ updates the output sequence,
+\begin{equation}
+  U^*=\sum_{i:z_i=m^*}w_{i\mid m^*}U_i.
+\end{equation}
+Raw mixture-importance correction and adaptive covariance are disabled in the
+frozen result configuration because their ablations did not establish a
+reliable aggregate advantage.
+
+\subsection{V3.1: grouped-sampling stability and allocation}
+
+The first grouped controller required additional policy to remain continuous
+over repeated control cycles. V3.1 added:
+\begin{itemize}[leftmargin=*]
+  \item a protected allocation for the global-path or nominal fallback;
+  \item a persistent shifted warm-start sequence for every active mode;
+  \item a free-energy estimate and effective sample size (ESS);
+  \item mode selection with minimum dwell time, an improvement margin, and
+  multi-cycle confirmation;
+  \item significant angular sign-flip, mode-switch, fallback-selection,
+  path-error, safety, and timing diagnostics.
+\end{itemize}
+
+The fallback allocation is configured by \code{--fallback-share}. The selected
+development default reserves 25\% of the batch for the protected path/fallback
+and divides the remaining 75\% among feasible branches. Mode commitment is
+configured by \code{--mode-dwell}, \code{--mode-confirm}, and
+\code{--switch-margin}.
+
+\subsubsection{V3.1 development ablation}
+
+The ablation used BARN worlds 4, 48, and 49 with seeds 0 and 1, robot radius
+0.34\,m, $K=1024$, $T=56$, and $\Delta t=0.05$\,s. It compared the original
+single-Gaussian hybrid baseline against four grouped policies:
+\begin{description}[leftmargin=2.7cm,style=nextline]
+  \item[Path25] 25\% protected path allocation.
+  \item[Path50] 50\% protected path allocation.
+  \item[Path70] 70\% protected path allocation.
+  \item[Conservative] 50\% path allocation, 20-cycle dwell, five-cycle
+  confirmation, and a 0.6 switching margin.
+\end{description}
+
+\begin{table}[h]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lrrrrrrrrr}
+\toprule
+\textbf{Policy} & \textbf{Success} & \textbf{Time} & \textbf{Path} &
+\textbf{Worst clear.} & \textbf{Flips} & \textbf{Switches} &
+\textbf{Fallback} & \textbf{ESS} & \textbf{Path error} \\
+\midrule
+Baseline & 6/6 & 24.5\,s & 9.28\,m & 0.098\,m & 166.7 & 0.0 &
+1.00 & --- & 0.102\,m \\
+Path25 & 6/6 & 20.3\,s & 8.98\,m & 0.095\,m & 15.8 & 8.3 &
+0.68 & 17.3 & 0.064\,m \\
+Path50 & 6/6 & 20.3\,s & 9.00\,m & 0.091\,m & 15.5 & 6.7 &
+0.73 & 19.3 & 0.066\,m \\
+Path70 & 6/6 & 20.4\,s & 8.99\,m & 0.091\,m & 17.3 & 6.7 &
+0.78 & 19.8 & 0.065\,m \\
+Conservative & 6/6 & 20.4\,s & 8.99\,m & 0.083\,m & 17.5 & 3.2 &
+0.53 & 18.7 & 0.072\,m \\
+\bottomrule
+\end{tabular}}
+\caption{V3.1 grouped-sampling development ablation. ESS is the mean
+within-mode effective sample size; fallback is the selected-cycle fraction.}
+\label{tab:v31ablation}
+\end{table}
+
+Path25 was selected as the development default. Relative to the baseline, it
+reduced significant angular sign reversals by about 90\%, reduced mean path
+error by about 37\%, and completed the six cases roughly four seconds faster.
+Increasing the protected path allocation did not monotonically improve
+tracking or clearance. The conservative policy reduced switching but had the
+worst clearance and path error, showing that excessive commitment can preserve
+a degrading mode.
+
+These results were not treated as proof of superiority. There were only six
+runs per configuration, grouped worst-case clearance remained slightly below
+the baseline, all worlds came from the same environment family, and no dynamic,
+stale-plan, or skid-steer experiment was included.
+
+\subsubsection{V3.1 observations that shaped later versions}
+
+\begin{enumerate}[leftmargin=*]
+  \item Minimum per-mode ESS approached one in every grouped setting. This
+  directly motivated log-domain V4 weighting, explicit degeneracy tests, and
+  the later V4.1 ESS guard.
+  \item Episodes showed only 2--12 committed switches but 6--12 distinct branch
+  IDs. Endpoint-based identity matching was not stable enough for a long-lived
+  Nav2 proposal bank.
+  \item Mean grouped field construction was about 27\,ms, branch proposal
+  generation 6.4\,ms, and path proposal generation 4.2\,ms on the development
+  workstation. This motivated the asynchronous topology-worker design for the
+  Nav2 port.
+  \item The circular footprint and ideal differential-drive model remained
+  insufficient representations of the SLIP skid-steer platform.
+\end{enumerate}
+
+\subsection{V3.2: global replanning and gated assistance}
+
+The hybrid controller has two operational states:
+\begin{description}[leftmargin=2.8cm,style=nextline]
+  \item[NORMAL] Follow the protected global-path proposal while the path is
+  locally valid and the robot is progressing.
+  \item[ASSIST] Expose pseudopod modes when the path is blocked, clearance is
+  confined, or progress stalls.
+\end{description}
+
+The sandbox can periodically rerun A* from the current pose. A successful new
+plan updates the same controller instance, increments a plan version, and
+returns the system to NORMAL when appropriate. This models the fact that Nav2's
+global planner replans as the robot moves; the controller is not permanently
+fixated on the original path.
+
+\subsection{V4: corrected Gaussian-mixture importance weighting}
+
+V4 implements the requested correction:
+\begin{equation}
+  \log \widetilde{w}_k =
+  -\frac{S(U_k)}{\lambda}
+  + \log p(U_k)
+  - \log q(U_k).
+  \label{eq:v4weight}
+\end{equation}
+
+\paragraph{Target distribution $p$.}
+The nominal target is a diagonal Gaussian around the protected fallback mean:
+\begin{equation}
+  p(U)=\Normal(U;\mu_{\mathrm{fallback}},\Sigma).
+\end{equation}
+For \code{hybrid}, the fallback is the dynamically feasible global-path
+proposal. For \code{local}, it is the shifted nominal MPPI sequence.
+
+\paragraph{Proposal distribution $q$.}
+The complete density includes every active branch and fallback:
+\begin{equation}
+ q(U)=\sum_{m=1}^{M}\pi_m
+ \Normal(U;\mu_m,\Sigma).
+\end{equation}
+The coefficients $\pi_m=N_m/K$ equal the actual fixed-group sample
+proportions. The log mixture is evaluated stably:
+\begin{equation}
+ \log q(U)=\operatorname{LSE}_{m}
+ \left[\log\pi_m+\log\Normal(U;\mu_m,\Sigma)\right],
+\end{equation}
+where $\operatorname{LSE}(a_i)=a_{\max}+
+\log\sum_i\exp(a_i-a_{\max})$.
+
+\paragraph{Latent versus projected controls.}
+Gaussian densities are evaluated on raw latent sequences before velocity and
+acceleration projection. Projection is deterministic but many-to-one; treating
+the clipped/projected controls as ordinary Gaussian samples would give an
+incorrect density.
+
+\paragraph{Preserving route modes.}
+The corrected weights determine mode evidence and the conditional update
+inside each mode. The committed-mode policy remains active, so the estimator
+does not average topologically incompatible routes into one command sequence.
+
+\paragraph{Important caution.}
+Mathematical correction does not guarantee lower finite-sample variance.
+The $\log p-\log q$ ratio can reduce effective sample size when branch means
+are far from the target. V3 and V4 must therefore be compared empirically;
+V4 should not be claimed superior solely because it is formally corrected.
+
+\subsection{V4.1: cycle-coherent ESS guard}
+
+The blocked-path experiment confirmed the variance concern. Some branch groups
+contained hundreds of samples but had corrected ESS near one. The resulting
+mode evidence favored the protected fallback and raw V4 failed to pass the
+blockage.
+
+V4.1 therefore evaluates the corrected effective sample size for each active
+mode $m$:
+\begin{equation}
+  \operatorname{ESS}_m =
+  \frac{1}{\sum_{k \in m} \bar{w}_{k,m}^{\,2}},
+\end{equation}
+where $\bar{w}_{k,m}$ are the corrected weights normalized within mode. A mode
+triggers the guard when
+\begin{equation}
+  \operatorname{ESS}_m <
+  \max\left(8,\;0.02N_m\right).
+  \label{eq:essguard}
+\end{equation}
+
+If any active mode triggers Equation~\ref{eq:essguard}, the complete control
+cycle uses V3 within-mode weights and V3 free energies. Falling back for the
+whole cycle is intentional: using V3 evidence for one mode and corrected V4
+evidence for another would compare quantities on different statistical
+scales. Raw V4 weights, free energies, and ESS values are retained as
+diagnostics even during a guarded cycle.
+
+\subsubsection{Development comparison}
+
+The first normal-path comparison on BARN world 48, seed 0, was not a meaningful
+mixture test. Automatic gating remained in NORMAL, so all 1024 samples belonged
+to the path component. In that single-component case $p=q$, and V3 and V4
+correctly produced identical trajectories.
+
+A genuine multimodal comparison used world 48, seed 0, radius 0.34\,m, a
+deliberately blocked centre-lane path, automatic assistance, Nav2-like path
+validity, and no replanning:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrrrrrrr}
+\toprule
+\textbf{Weights} & \textbf{Result} & \textbf{Time} & \textbf{Path} &
+\textbf{Clear.} & \textbf{Stall} & \textbf{Switch} & \textbf{Flips} \\
+\midrule
+V3 & success & 29.00\,s & 10.43\,m & 0.100\,m & 0.60\,s & 6 & 42 \\
+V4 & timeout & 60.00\,s & 7.56\,m & 0.181\,m & 17.20\,s & 1 & 31 \\
+V4.1 & success & 26.95\,s & 10.06\,m & 0.110\,m & 0.95\,s & 6 & 27 \\
+\bottomrule
+\end{tabular}
+\caption{Single-case blocked-path development comparison.}
+\label{tab:v41blocked}
+\end{table}
+
+V4.1 restored success, but the guard was active for 498 cycles and 1298 of
+1355 mode evaluations (95.8\%). This demonstrates a successful degeneracy
+fallback, not an advantage from corrected weighting. V3 remains the controller
+baseline; raw V4 remains diagnostic-only until a multi-world, multi-seed
+benchmark supports a stronger conclusion.
+
+\section{Global planner relationship}
+
+The pseudopod layer is not a replacement global planner. The intended
+responsibility split is:
+
+\begin{itemize}[leftmargin=*]
+  \item The global planner provides long-range route intent and replans as the
+  robot moves.
+  \item Nav2 path handling transforms and prunes the latest plan.
+  \item MPPI normally follows a dynamically feasible path proposal.
+  \item Local pseudopods become additional proposals when blockage,
+  confinement, or local-minimum behavior makes the normal proposal unreliable.
+  \item If topology data is stale or invalid, the controller immediately falls
+  back to ordinary Nav2 MPPI/path behavior.
+\end{itemize}
+
+This makes the research claim narrower and more defensible: local topology
+provides explicit alternative proposal modes where a single local control
+distribution is insufficient.
+
+\section{Software architecture}
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{p{0.28\linewidth}p{0.63\linewidth}}
+\toprule
+\textbf{File} & \textbf{Responsibility} \\
+\midrule
+\code{mppi.py} & MPPI rollout, costs, V3 grouped update, V4 correction, mode
+selection and warm-start bank. \\
+\code{amoeba_controllers.py} & Local and hybrid controller policy, field
+rebuild, path gating and proposal preparation. \\
+\code{env.py} & BARN environment, clearance, global and local flow fields. \\
+\code{pseudopods.py} & V1 frontier selection, centreline tracing,
+deduplication and stable IDs. \\
+\code{proposals.py} & V2 centreline-to-control conversion and feasibility. \\
+\code{grouped_sampling.py} & Group allocation, sampling, constraint projection,
+Gaussian log densities, mixture log density, V4 importance weights. \\
+\code{robot_model.py} & Shared V6 ideal/skid motion, oriented footprint, and
+turn/speed safety margins. \\
+\code{astar.py} & Sandbox global A* planner. \\
+\code{simulation.py} & Episode loop and performance metrics. \\
+\code{cli.py} & Command-line configuration and renderer selection. \\
+\code{visualization.py} & Matplotlib static figures and compatibility animation. \\
+\code{pyqtgraph_visualization.py} & Fast PyQtGraph live animation. \\
+\code{tests/test_importance_weighting.py} & Closed-form and integration tests for V4. \\
+\code{experiments/v5_ablation.py} & Fixed/adaptive covariance benchmark harness. \\
+\code{experiments/v6_ablation.py} & Ideal/analytical-SLIP matched benchmark harness. \\
+\code{torch_port/} & Independent batched tensor core, BARN/geodesic runtime,
+A* hybrid controller, tests, benchmark, and PyQtGraph observer. \\
+\bottomrule
+\end{tabular}
+\caption{Current sandbox code map.}
+\end{table}
+
+\section{Verification status}
+
+At the time of writing, 54 automated tests pass in the PyTorch environment.
+The dependency-light system-Python workflow passes the original tests and
+skips nine optional PyTorch tests. They cover:
+
+\begin{itemize}[leftmargin=*]
+  \item two branches around a pillar and one branch in open space;
+  \item branch-ID stability after small robot motion;
+  \item full bounded V2 sequences and matching rollout dynamics;
+  \item collision-based proposal infeasibility;
+  \item deterministic sample allocation and preserved mode labels;
+  \item velocity, acceleration and angular-acceleration projection;
+  \item persistent per-mode warm starts and switching hysteresis;
+  \item global-path fallback protection and NORMAL/ASSIST transitions;
+  \item closed-form diagonal Gaussian log densities;
+  \item manually evaluated two-component mixture density;
+  \item numerical stability in a far Gaussian tail;
+  \item reduction to vanilla MPPI weights when $p=q$;
+  \item V4 controller diagnostics and normalized weights;
+  \item V4.1 ESS-triggering, cycle-coherent fallback, and diagnostics.
+  \item V5 component-specific sampling, mixture densities, covariance
+  schedules, and ablation bookkeeping.
+  \item V6 ideal/slip integration, footprint clearance, safety margins, and
+  ablation bookkeeping;
+  \item deterministic NumPy/PyTorch rollout, projection, cost, density, and
+  importance-weight parity;
+  \item independent PyTorch BARN, A*, NORMAL/ASSIST, protected-path, and
+  blocked-path assistance behavior.
+\end{itemize}
+
+The tests demonstrate implementation consistency, not hardware readiness.
+Single-world development runs are not sufficient evidence of robustness.
+
+\section{How to run the sandbox}
+
+\subsection{Run all tests}
+\begin{lstlisting}
+cd /home/saran/robohouse_ws/amoeba_sandbox
+python3 -m unittest discover -v
+\end{lstlisting}
+
+\subsection{Recommended V4 visualization}
+\begin{lstlisting}
+python3 run.py --controller hybrid --world 48 --radius 0.34 \
+  --grouped-sampling --importance-weighting \
+  --gate auto --nav2-path-validity \
+  --replan-every 1.0 --mode-debug-every 20 --animate
+\end{lstlisting}
+
+\subsection{Compare V3, V4, and V4.1}
+
+Run the same case three times. V3 omits \code{--importance-weighting}; V4 includes
+it, and V4.1 additionally includes \code{--importance-ess-guard}. Use the same
+world, robot radius, and seed. Disable animation when measuring wall-clock
+computation.
+
+\begin{lstlisting}
+# V3
+python3 run.py --controller hybrid --world 48 --seed 0 \
+  --radius 0.34 --grouped-sampling --gate auto \
+  --nav2-path-validity --replan-every 1.0
+
+# V4
+python3 run.py --controller hybrid --world 48 --seed 0 \
+  --radius 0.34 --grouped-sampling --importance-weighting \
+  --gate auto --nav2-path-validity --replan-every 1.0
+
+# V4.1
+python3 run.py --controller hybrid --world 48 --seed 0 \
+  --radius 0.34 --grouped-sampling --importance-weighting \
+  --importance-ess-guard --gate auto --nav2-path-validity \
+  --replan-every 1.0
+\end{lstlisting}
+
+To exercise a real mixture rather than the single path component, replace the
+A* plan with the blocked development path by adding \code{--lane center} and
+omitting \code{--replan-every}.
+
+Images belong under \code{artifacts/images}; numerical experiment tables belong
+under \code{artifacts/results}. Reusing an output filename overwrites it.
+
+\section{Known limitations and unclear assumptions}
+
+\begin{enumerate}[leftmargin=*]
+  \item V6 contains an analytical skid-steer response and rectangular
+  footprint, but its dimensions, yaw gain, speed-dependent yaw loss, and
+  uncertainty margins have not been identified from the physical SLIP robot.
+  \item V3 and raw V4 use fixed diagonal covariance. V5 adapts diagonal
+  entries using predicted clearance and turning demand, but the mapping is
+  hand-designed and not calibrated from SLIP data.
+  \item Mode-conditioned commitment is a policy decision layered on top of the
+  corrected importance weights. It intentionally avoids route averaging, but
+  its effect must be included in ablations.
+  \item The sandbox path cost is only an approximation of Nav2 critics. The C++
+  port should reuse PathAlign, PathFollow, obstacle, footprint and constraint
+  behavior rather than duplicate them.
+  \item Local field reconstruction is synchronous in Python. It must not block
+  the Nav2 control loop.
+  \item PyQtGraph is the default live renderer; Matplotlib remains available
+  for static publication figures and compatibility animation. Both are
+  callback observers and are irrelevant to controller timing. Headless runs
+  remain authoritative.
+  \item V4 has exhibited high importance-weight variance in the blocked-path
+  test. V4.1 preserves safety behavior by reverting to V3, but its 95.8\%
+  fallback rate means corrected weighting is not yet an active controller
+  improvement. ESS and tail behavior require multi-world, multi-seed
+  measurement.
+\end{enumerate}
+
+\section{V5, V6, and next versions}
+
+\subsection{V5: geometry-adaptive diagonal covariance}
+
+For each mode and horizon step, construct
+\begin{equation}
+  \Sigma_{m,t} =
+  \operatorname{diag}(\sigma^2_{v,m,t},\sigma^2_{\omega,m,t}).
+\end{equation}
+V5 evaluates clearance along each mode's predicted mean rollout and combines
+it with normalized turning demand. Open straight motion widens linear
+exploration. Confinement reduces linear variance but retains or increases
+angular exploration, since contracting both channels prevented lateral
+detours in the first development rule. Sampling and V4 density evaluation use
+the same component-specific covariance schedules.
+
+The fixed/adaptive ablation contains 48 matched runs: three worlds, two seeds,
+four static/dynamic and normal/blocked scenarios, and two covariance policies.
+
+\begin{table}[h]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llrrrrrrrr}
+\toprule
+\textbf{Scenario} & \textbf{Cov.} & \textbf{Success} & \textbf{Coll.} &
+\textbf{Time} & \textbf{Worst clear.} & \textbf{Stall} & \textbf{Flips} &
+\textbf{Switches} & \textbf{ESS} \\
+\midrule
+Normal & fixed & 6/6 & 0 & 20.4 & 0.085 & 0.0 & 9.5 & 0.0 & 89.1 \\
+Normal & V5 & 6/6 & 0 & 20.4 & 0.095 & 0.0 & 8.8 & 0.0 & 94.7 \\
+Blocked & fixed & 6/6 & 0 & 25.8 & 0.076 & 0.1 & 12.7 & 7.5 & 60.0 \\
+Blocked & V5 & 6/6 & 0 & 28.3 & 0.091 & 0.7 & 12.3 & 10.8 & 70.3 \\
+Dynamic & fixed & 5/6 & 1 & 24.4 & -0.007 & 0.5 & 12.0 & 5.5 & 45.9 \\
+Dynamic & V5 & 5/6 & 1 & 23.7 & -0.006 & 0.8 & 12.3 & 5.0 & 60.4 \\
+Dyn. blocked & fixed & 4/6 & 2 & 29.3 & -0.007 & 0.8 & 10.5 & 10.3 & 40.5 \\
+Dyn. blocked & V5 & 4/6 & 1 & 33.5 & -0.011 & 3.6 & 13.0 & 15.0 & 71.0 \\
+\bottomrule
+\end{tabular}}
+\caption{V5 fixed/adaptive covariance ablation. Times are means over
+successful runs. The V5 dynamic-blocked failures are one collision and one
+timeout; fixed covariance has two collisions.}
+\label{tab:v5ablation}
+\end{table}
+
+V5 improves worst static clearance and mean ESS in every scenario, but does
+not improve aggregate success. Blocked cases are slower and exhibit more mode
+switching. The two policies also fail on different dynamic cases. V5 is
+therefore complete as a research implementation and ablation, but remains an
+experimental option; fixed covariance with V3 weights remains the deployment
+baseline because the analytical V6 model has not improved aggregate success.
+Full covariance is deliberately deferred.
+
+\subsection{V6: analytical SLIP-specific feasibility}
+
+V6 centralizes prediction, proposal rollout, episode execution, path validity,
+and collision metrics in one configurable robot model. For commanded
+$u_t=[v_t,\omega_t]^\top$, the provisional skid-steer yaw response is
+\begin{equation}
+  \omega_t^{\mathrm{eff}}=
+  \frac{k_\omega\omega_t}
+       {1+k_s|v_t|/v_{\max}},
+  \qquad k_\omega=0.82,\quad k_s=0.55,
+\end{equation}
+followed by
+\begin{align}
+  \theta_{t+1}&=\theta_t+\omega_t^{\mathrm{eff}}\Delta t,\\
+  x_{t+1}&=x_t+v_t\cos(\theta_{t+1})\Delta t,\\
+  y_{t+1}&=y_t+v_t\sin(\theta_{t+1})\Delta t.
+\end{align}
+The assumed footprint is a $0.90\,\mathrm{m}\times0.65\,\mathrm{m}$ oriented
+rectangle sampled along its boundary and centre. Signed footprint clearance is
+\begin{equation}
+  c_f(x_t)=\min_{p\in\mathcal F(x_t)}c_{\mathrm{map}}(p),
+\end{equation}
+and the hard analytical uncertainty allowance is
+\begin{equation}
+  m_t^{\mathrm{extra}}=
+  0.08\frac{|\omega_t^{\mathrm{eff}}|}{\omega_{\max}}
+  +0.03\frac{|v_t|}{v_{\max}}.
+\end{equation}
+A rollout is marked colliding when $c_f(x_t)<m_t^{\mathrm{extra}}$. The
+orientation-free A* and geodesic layers use the width proxy
+\begin{equation}
+  r_p=\frac{0.65}{2}+0.08=0.405\ \mathrm{m};
+\end{equation}
+the full circumcircle made all three development worlds unreachable, while
+oriented rollout checks still enforce the complete rectangle.
+
+The matched 48-run comparison used worlds 4, 48, and 49; seeds 0 and 1; and
+normal, blocked, dynamic, and dynamic-blocked scenarios.
+\begin{table}[h]
+\centering
+\begin{tabular}{llrrr}
+\toprule
+\textbf{Scenario} & \textbf{Model} & \textbf{Success} & \textbf{Coll.} &
+\textbf{Worst clear.} \\
+\midrule
+Normal & ideal & 6/6 & 0 & 0.085 \\
+Normal & analytical SLIP & 5/6 & 1 & $-0.000$ \\
+Blocked & ideal & 6/6 & 0 & 0.076 \\
+Blocked & analytical SLIP & 5/6 & 1 & $-0.019$ \\
+Dynamic & ideal & 5/6 & 1 & $-0.007$ \\
+Dynamic & analytical SLIP & 4/6 & 2 & $-0.013$ \\
+Dynamic blocked & ideal & 4/6 & 2 & $-0.009$ \\
+Dynamic blocked & analytical SLIP & 2/6 & 4 & $-0.027$ \\
+\bottomrule
+\end{tabular}
+\caption{V6 ideal/analytical-SLIP development ablation. Clearance is in
+metres and uses each model's own footprint convention.}
+\label{tab:v6ablation}
+\end{table}
+
+V6 successfully establishes shared model and footprint plumbing and exposes
+contacts hidden by the circular ideal model. It does not improve success and
+is not hardware-ready. The dynamic failures motivate V6.1 horizon-aware
+obstacle prediction; physical bags and footprint measurements are required for
+V6.2 calibration.
+
+\subsection{Independent PyTorch acceleration track}
+
+The sibling \code{torch_port} implementation leaves the NumPy reference
+unchanged. CPU topology operations construct the BARN map, A* plan, rolling
+geodesic body, pseudopods, and ancillary means. Device tensors perform grouped
+sampling, constraint projection, batched rollout, footprint lookup, trajectory
+costs, and MPPI updates. Its hybrid layer protects the A* path in NORMAL,
+activates pseudopods in ASSIST, applies dwell/confirmation commitment, and can
+replan periodically. The light-mode PyQtGraph renderer is an observer and is
+excluded from timing. CUDA throughput and multi-world episode batching must be
+reported separately from mathematical controller comparisons.
+
+\subsection{V6.1 and V6.2}
+
+V6.1 replaces current-position-only dynamic collision scoring with a
+horizon-indexed obstacle estimate. For obstacle $j$ with observed centre
+$o_{j,0}$ and velocity estimate $\hat v_j$,
+\begin{equation}
+  \hat o_{j,t}=o_{j,0}+\hat v_j t\Delta t,
+\end{equation}
+and rollout clearance becomes a function of both sample and horizon index.
+The implemented predictor holds its last extrapolation after 2.0,s and grows
+the obstacle radius by 0.03,m per predicted second. It is opt-in, so static
+behavior and the V6 baseline remain unchanged. A first world-42, seed-0,
+15,s A/B run timed out in both cases, but prediction increased minimum
+clearance from 0.050,m to 0.246,m and progress from 6.55,m to 6.77,m. This
+is promising evidence, not a success claim; multi-world V7 statistics are
+still required. A subsequent two-world paired pilot (worlds 42 and 48,
+one seed, 256 samples, 300 control cycles) reduced collisions from one to
+zero, raised mean minimum clearance from 0.072,m to 0.237,m, and added only
+about 0.2,Hz of measured overhead. Both predicted runs timed out, so the
+pilot supports safety but does not yet establish task success. V6.2 then
+identifies footprint,
+actuation, slip, acceleration, and stopping parameters from physical SLIP
+measurements rather than further hand-tuning the analytical placeholders.
+
+\subsection{V7: benchmark and ablation}
+
+The benchmark infrastructure compares vanilla MPPI, path-biased MPPI, and the
+complete amoeba controller. V7.1 adds dynamic-junction cases aimed directly at
+the thesis claim, and V7.2 adds the PyTorch execution track. Existing results
+are development evidence rather than a final thesis comparison: the final
+matrix must use matched worlds and seeds and report success, collision rate,
+time, path length, minimum clearance, stall duration, angular sign flips, mode
+switches, fallback fraction, ESS, field/proposal/MPPI timing, and memory use.
+
+\subsection{Evaluation metrics and reporting protocol}
+
+The thesis evaluation will not treat every terminal value as an independent
+claim.  Metrics are grouped by the question they answer and are evaluated on
+matched world--seed pairs.  Let episode $e$ contain robot position $p_t$,
+commanded linear velocity $v_t$, control period $\Delta t$, termination time
+$T_e$, and shortest collision-free A* reference length $L_e^{*}$.  The primary
+task metric is
+\begin{equation}
+ s_e=\mathbb I[\text{goal reached without collision before the time limit}],
+ \qquad \hat S=\frac{1}{E}\sum_{e=1}^{E}s_e .
+ \label{eq:benchmark-success}
+\end{equation}
+Failures must also be separated into static collision, moving-obstacle
+collision, robot--robot collision, and timeout; success rate alone can conceal
+whether a controller is safe but excessively conservative.
+
+Safety is reported using signed footprint clearance, for which zero denotes
+contact and a negative value denotes overlap.  For obstacle class
+$q\in\{\mathrm{static},\mathrm{moving}\}$,
+\begin{equation}
+ c^{\min}_{q,e}=\min_{0\leq t\leq T_e}c_q(x_t),
+ \qquad
+ c^{\min}_{\mathrm{peer},e}
+ =\min_t\bigl(\lVert p_t^1-p_t^2\rVert_2-r_1-r_2\bigr).
+ \label{eq:benchmark-clearance}
+\end{equation}
+The peer expression is the circular clearance proxy currently used by the
+reciprocal runner; static and scripted-obstacle checks use the implemented
+SLIP footprint geometry.  Clearance distributions and their lower tail are
+more informative than reporting only their mean.
+
+Efficiency and recovery behaviour are measured by
+\begin{align}
+ L_e &= \sum_{t=1}^{T_e}\lVert p_t-p_{t-1}\rVert_2,
+ &\rho_{L,e}&=L_e/L_e^{*},\\
+ L_e^{-} &= \sum_t\max(0,-v_t)\Delta t,
+ &T_{\mathrm{stall},e}&=\Delta t\sum_t
+ \mathbb I[|v_t|<v_{\epsilon}\wedge d_{\mathrm{goal}}>d_{\epsilon}].
+ \label{eq:benchmark-efficiency}
+\end{align}
+Completion time, path length, and reverse distance are already logged.  The
+normalised path ratio and stall duration are derivable or require a small
+telemetry addition.  Mode switches, topology switches, recovery activations,
+and planned-yield duration diagnose oscillation and deadlock rather than task
+quality directly; lower values are desirable only when success and clearance
+are maintained.
+
+For topology-aware experiments the runner also records the number of route
+candidates, chosen route indices, predicted route-pair clearance, feasibility,
+active topology, route-conflict prior, prediction horizon, and topology-switch
+count.  These measurements test the causal claim that an alternative route was
+available, recognised, and used.  An early-decision latency---time from episode
+start until a conflicting route is rejected---should be added before the final
+multi-robot study.
+
+MPPI proposal health is characterised by normalised effective sample size
+\begin{equation}
+ \mathrm{ESS}=\frac{(\sum_{k=1}^{N}w_k)^2}{\sum_{k=1}^{N}w_k^2},
+ \qquad \mathrm{nESS}=\mathrm{ESS}/N,
+ \label{eq:benchmark-ess}
+\end{equation}
+plus fallback fraction, allocation per mode, and selected mode.  These are
+mechanism metrics: they explain a result but do not replace success, safety,
+or efficiency.  ESS and fallback telemetry exist in the NumPy research path
+but must be exported consistently by the PyTorch benchmark before being used
+in the final comparison.
+
+Under peer-intention prediction, the mean hypothesis probabilities and their
+entropy are reported,
+\begin{equation}
+ H(p)=-\sum_h p_h\log p_h .
+ \label{eq:benchmark-entropy}
+\end{equation}
+High entropy indicates that the predictor remains uncertain; it is not by
+itself either good or bad.  Prediction quality should ultimately be evaluated
+against the realised peer motion using negative log likelihood or a proper
+calibration score, not agreement with the old heuristic.
+
+Computational performance uses mean, 95th-percentile, and maximum controller
+latency, together with
+\begin{equation}
+ R_{\mathrm{sim}}=T_e/T_{\mathrm{wall}},
+ \qquad
+ f_{\mathrm{miss}}=\frac{1}{T_e}\sum_t
+ \mathbb I[t_{\mathrm{controller}}>\Delta t].
+ \label{eq:benchmark-runtime}
+\end{equation}
+The current reciprocal runner logs controller latency and wall time, so
+$R_{\mathrm{sim}}$ is derivable; deadline-miss fraction and peak GPU memory
+remain additions.  Animation is disabled for timing trials.
+
+The minimum thesis comparison therefore reports, per controller and scenario:
+success with its failure breakdown, minimum static/dynamic clearance,
+completion time, path length and normalised path ratio, reverse and stall
+behaviour, controller latency, and the relevant mechanism metrics.  Continuous
+metrics are presented as median and interquartile range with a paired
+bootstrap confidence interval; paired success outcomes use McNemar's test.
+Worlds and seeds, robot model, sample count, horizon, device, and time limit
+remain identical within each controller comparison.  Exploratory pilot runs
+are labelled separately and are not pooled into the confirmatory benchmark.
+
+\subsection{Reciprocal interaction-risk ablation}
+
+The PyTorch reciprocal pilot evaluates four peer futures: constant velocity,
+following the peer's A* path, yielding to a stop, and reversing. For MPPI
+sample $k$, let $J_k^{(h)}$ denote its interaction cost under hypothesis $h$.
+Three aggregation rules were tested:
+\begin{align}
+  J_k^{\mathrm{worst}} &= \max_h J_k^{(h)},\\
+  J_k^{\mathrm{mean}} &= \frac{1}{H}\sum_{h=1}^{H}J_k^{(h)},\\
+  J_k^{\mathrm{CVaR}_{0.5}} &=
+    \operatorname{mean}\!\left(\text{worst half of }\{J_k^{(h)}\}_{h=1}^H\right).
+\end{align}
+The matched five-seed static and two-moving-obstacle suites used world 93,
+the SLIP footprint, 1024 samples, a 56-step horizon, and CUDA. Constant-
+velocity prediction succeeded in 10/10 trials. Worst-case hypotheses
+succeeded in 6/10 and CVaR in 7/10. Static/dynamic mean minimum peer clearance
+was 0.127/0.182,m for constant velocity, 0.680/0.693,m for worst-case, and
+0.793/0.706,m for CVaR. The hypothesis variants also reversed farther and
+switched modes much more frequently.
+
+Equal-weight mean aggregation was then screened only on the two previously
+difficult seeds to avoid an unnecessary full matrix. It succeeded in one of
+four static/dynamic trials; both dynamic trials timed out with 38 and 69 mode
+switches. Aggregation alone therefore does not solve the deadlock. A single
+collision hypothesis retains a contribution near $10000/4=2500$ even under
+the mean, while unsupported yield and reverse futures remain active.
+
+The next interaction model will retain hard static and scripted-obstacle
+safety checks but weight peer futures using observation-conditioned
+probabilities,
+\begin{equation}
+  J_k = J_{\mathrm{static},k}+J_{\mathrm{path},k}
+        +\sum_{h=1}^{H}p_h J_{\mathrm{peer},k}^{(h)}.
+\end{equation}
+Path alignment, deceleration, and observed backward motion will update the
+corresponding probabilities. Reverse will become a hysteretic deadlock-
+recovery state rather than an ordinary continuously competing mode. This
+hand-crafted probabilistic model is the intermediate ablation before a
+learned local-goal probability estimator.
+
+The first hand-crafted stage is implemented: each path or pseudopod ancillary
+mean is rolled out as an ego local intention, assigned a separate temporally
+smoothed peer-intention distribution, and its MPPI samples use those weights.
+The runner records mean intention probabilities and entropy. Difficult-seed
+validation and a hysteretic reverse-recovery state remain pending. The first
+difficult-static screen passed both seeds: mean completion time was 25.93,s,
+minimum peer clearance 0.327,m, mode switches 8.5, and reverse distance
+0.48,m. Equal-weight mean had passed only one of the same two seeds, with 23.5
+switches and 2.80,m reverse distance. This supports the probability-weighted
+architecture as a screening result; the matched dynamic screen remains next.
+The subsequent dynamic screen passed seed 0 but seed 1 timed out with 72 mode
+switches and 4.475,m of reversing even though inferred reverse probability was
+below one percent. This identified the independently competing reverse
+proposal as the remaining failure mechanism. Reverse is now gated by a
+hysteretic \code{NORMAL/YIELD/RECOVERY\_REVERSE/REJOIN} state machine with
+persistent-conflict entry, bounded recovery, and cooldown. Only dynamic seed 1
+must be repeated before expanding the matrix.
+The forward-priority repeat passed: both robots finished in 49.65,s, the non-
+yielding robot used zero reverse motion, and peer clearance was 0.166,m. The
+yielding robot nevertheless invoked recovery five times, total mode switches
+were 36, and static clearance reached 0.027,m. This is a passed causal
+regression, not a final efficiency or robustness result.
+
+\subsection{V7.3: topology-guided parallel Amoeba MPPI}
+
+The first multi-route implementation selected one pair of A* routes before
+the episode and discarded the alternatives. That preselection is useful as a
+screen, but it is not topology-driven parallel trajectory optimization. V7.3
+therefore keeps every accepted global route active as a separate MPPI mode.
+This section records the implemented approximation and explicitly does not
+claim equivalence to T-MPC: route geometry is currently generated once from
+the static map, whereas generation of new dynamic space--time homotopy classes
+online remains future work.
+
+For robot $a$, repeated penalized A* produces the candidate set
+\begin{equation}
+  \mathcal R^a=\{R^a_0,\ldots,R^a_{K_a-1}\}.
+\end{equation}
+After accepting route $R_j$, cells within a tube of radius $r_{\mathrm{pen}}$
+receive an additional traversal cost before the next A* search. Numerical
+variants of the same route are rejected using the symmetric mean nearest-point
+separation
+\begin{equation}
+ d_{\mathrm{sym}}(R_i,R_j)
+ =\frac{1}{2|R_i|}\sum_{p\in R_i}\min_{q\in R_j}\|p-q\|_2
+ +\frac{1}{2|R_j|}\sum_{q\in R_j}\min_{p\in R_i}\|q-p\|_2.
+ \label{eq:global-route-separation}
+\end{equation}
+A candidate is retained only if $d_{\mathrm{sym}}\ge\epsilon_R$ for every
+accepted route. This is a practical geometric diversity proxy, not a formal
+homotopy signature. A single-corridor world may consequently and correctly
+return only one spatial route.
+
+Before closed-loop execution, the reciprocal pilot screens every route pair
+and an initial yielding delay $\delta$ for robot~1. With constant-speed
+arc-length interpolation $p(R,t;v,\delta)$, it selects
+\begin{equation}
+ (i_0,j_0,\delta_0)
+ =\arg\min_{i,j,\delta}
+ \left[
+   \frac{L(R^1_i)+L(R^2_j)}{v_R}
+   +w_\delta\delta
+   +J_{\mathrm{pair}}(R^1_i,R^2_j,\delta)
+ \right].
+ \label{eq:initial-route-pair}
+\end{equation}
+This supplies an initial compatible pair only. It does not remove the other
+routes from either controller.
+
+For every retained route $R_k$, the same receding branch follower used for a
+pseudopod constructs a route-conditioned ancillary mean
+\begin{equation}
+  \mu_{R_k}=\mathcal C(R_k,x_t,u_{t-1})
+  =[u_{k,0},\ldots,u_{k,T-1}].
+\end{equation}
+The controller's active proposal set is consequently
+\begin{equation}
+ \mathcal Z_t=
+ \underbrace{\{R_0,\ldots,R_{K-1}\}}_{\text{global route modes}}
+ \cup
+ \underbrace{\mathcal A_t}_{\text{local amoeba pseudopods}}
+ \cup
+ \underbrace{\mathcal Y_t}_{\text{wait/yield/reverse modes}}
+ \cup\{0\},
+ \label{eq:parallel-topology-set}
+\end{equation}
+where mode $0$ is the nominal fallback. Samples are never averaged across
+these labels. Instead,
+\begin{equation}
+ U_n\mid z_n=z\sim\mathcal N(\mu_z,\Sigma),
+ \qquad \sum_{z\in\mathcal Z_t}N_z=N.
+ \label{eq:parallel-topology-mixture}
+\end{equation}
+
+Route samples are scored against their own reference, not against the
+currently selected route. Let $d_k(x)$ be lateral distance to $R_k$ and let
+$\mathcal L_k(x)$ be remaining route length at the closest projected point.
+The implemented route term for sample trajectory $X_n$ is
+\begin{equation}
+ J_{R_k}(X_n)=
+ 5\,[d_k(x_{n,T})+\mathcal L_k(x_{n,T})]
+ +2\,\overline{[d_k+\mathcal L_k]}(X_n)
+ +4\,\overline d_k(X_n).
+ \label{eq:route-conditioned-cost}
+\end{equation}
+Each label then has its own conditional weights, update, and free energy,
+\begin{align}
+ w_{n\mid z}
+ &=\frac{\exp[-(S_n-S_{z,\min})/\lambda]}
+         {\sum_{m:z_m=z}\exp[-(S_m-S_{z,\min})/\lambda]},\\
+ \widehat U_z&=\sum_{n:z_n=z}w_{n\mid z}U_n,\\
+ F_z&=S_{z,\min}
+ -\lambda\log\!\left[
+   \frac{1}{N_z}\sum_{n:z_n=z}
+   \exp\!\left(-\frac{S_n-S_{z,\min}}{\lambda}\right)
+ \right].
+ \label{eq:parallel-route-free-energy}
+\end{align}
+The selected topology changes only after the candidate is better by a margin
+$\Delta_F$, satisfies a minimum dwell time, and wins for $C$ confirmation
+cycles:
+\begin{equation}
+ z_{t+1}=
+ \begin{cases}
+ z', & F_{z'}+\Delta_F<F_{z_t}
+       \text{ for $C$ cycles and dwell is satisfied},\\
+ z_t, & \text{otherwise}.
+ \end{cases}
+ \label{eq:topology-hysteresis}
+\end{equation}
+Only $\widehat U_{z_{t+1}}$ supplies the command. This prevents a left-route
+mean and right-route mean from producing an unsafe averaged command.
+
+The local MPPI horizon is $T\Delta t=2.8$\,s, which is too short to expose a
+head-on conflict near the middle of a long corridor. V7.3 therefore adds a
+second, cooperative route timescale. Let $\bar R^a_k(x_t)$ denote the
+uncompleted suffix of candidate route $k$, and let $\bar R^b$ be the peer's
+announced active route suffix. At nominal speeds $v_a$ and $v_b$,
+\begin{align}
+ T_{k}^{\mathrm{route}}
+ &=\max\!\left(
+   \frac{L(\bar R^a_k)}{v_a},
+   \frac{L(\bar R^b)}{v_b}\right),\\
+ p^a_k(t)&=p(\bar R^a_k,t;v_a,0),
+ \qquad
+ p^b(t)=p(\bar R^b,t;v_b,0),\\
+ d_{k}(t)&=\|p^a_k(t)-p^b(t)\|_2.
+\end{align}
+With required centre separation
+\begin{equation}
+ d_{\mathrm{req}}=r_a+r_b+m_R,
+ \qquad
+ e_k(t)=\max(0,d_{\mathrm{req}}-d_k(t)),
+\end{equation}
+the implemented long-horizon conflict prior is
+\begin{equation}
+ J_k^{\mathrm{route\mbox{-}conflict}}
+ =w_c\left[
+   \max_{0\le t\le T_k^{\mathrm{route}}}e_k(t)^2
+   +\frac{1}{4}\,\overline{e_k(t)^2}
+ \right],
+ \qquad
+ (v_a,m_R,w_c)=(0.30,0.12,80).
+ \label{eq:long-route-conflict}
+\end{equation}
+The peak term prevents a short predicted collision from being diluted by a
+30-second route, while the mean term penalizes sustained overlap. This scalar
+is added to every MPPI sample assigned to route $R_k$ before computing
+$F_{R_k}$. Thus eventual route conflict is visible near the beginning of the
+episode while short-horizon MPPI retains responsibility for detailed dynamics,
+footprint clearance, and control constraints.
+
+The current implementation provides two complementary topology levels:
+global route labels $R_k$ and local geodesic pseudopods $P_m$. It does not yet
+construct a separate geodesic body for every $R_k$, nor does it generate new
+LEFT/RIGHT/BEHIND/AHEAD space--time classes around changing obstacle
+predictions. Those are the next steps required before describing the method as
+a complete adaptation of topology-driven parallel trajectory optimization.
+
+\subsection{Final blocked-path ancillary attribution}
+
+The final blocked-split experiment freezes the SLIP footprint, 1024 samples,
+a 56-step horizon, fixed covariance, and stable V3 grouped weights. Vanilla
+MPPI failed 0/5 through static collision, path-tracking MPPI failed 0/5 through
+collision with the scripted blocker, and full Amoeba MPPI succeeded 5/5. To
+separate geodesic guidance from pseudopod sampling, a flow-only controller kept
+the identical field, path bias, gate, dynamics, and costs while disabling
+ancillary proposals.
+
+Across ten paired seeds, flow-only succeeded 2/10, with one peer collision,
+two static collisions, and five timeouts. Full Amoeba succeeded 9/10, with no
+collisions and one timeout. Seven pairs favored Amoeba, none favored flow-only,
+two succeeded under both, and one timed out under both. The exact two-sided
+McNemar result is $p=0.015625$. Amoeba reduced mean stall time from 19.96,s to
+5.02,s, increased mean peer clearance from 0.131,m to 0.703,m, and selected
+pseudopod modes in 47.6\% of cycles. Mean controller time rose from 137.56,ms
+to 148.68,ms in the parallel outcome run.
+
+The remaining Amoeba failure was a safe seed-5 timeout with 18.1,s stall time
+and 19 mode switches. It is retained without tuning. This result supports the
+specific claim that topology-separated ancillary distributions add robustness
+beyond a geodesic flow field alone in the declared blocked-path scenario;
+ordinary narrow-world generality and isolated serial timing remain separate
+experiments.
+
+\subsection{Static generality and the single-path biased baseline}
+
+The ten-world, five-seed static matrix produced 25/50 successes for vanilla
+MPPI, 39/50 for path-tracking MPPI, 45/50 for single-path Biased MPPI, and
+50/50 for full Amoeba. The respective collision counts were 25, 11, 5, and
+zero. Mean clearance was 0.216,m, 0.233,m, 0.251,m, and 0.258,m. Mean
+successful completion time was 24.21,s, 25.36,s, 19.86,s, and 20.87,s,
+respectively.
+
+This result must be interpreted separately from the blocked-path attribution.
+In the static matrix Amoeba had ancillary modes available during 70.9\% of
+cycles, but selected a pseudopod mode in 0\% of cycles; ASSIST occupancy was
+only 2.0\%. Thus the static result supports the complete gated geodesic/path
+hybrid, not a causal pseudopod-sampling claim. The blocked-split experiment is
+the mechanism evidence.
+
+The label path MPPI in the original matrix denotes an A* path-tracking cost;
+it is not itself Biased MPPI. The \code{path\_biased} comparator instead uses
+one A*-derived ancillary control mean and draws the full MPPI batch around that
+mean. It improved six matched trials over path tracking without losing any.
+Its five failures all occurred in world~7; Amoeba succeeded in those same five
+trials and never lost a matched trial. Since those discordances share one
+geometry, they show a repeatable world-specific advantage, not five independent
+environment-level observations. The exact paired two-sided result is
+$p=0.0625$. This completes the comparison between vanilla sampling, path-cost
+shaping, single-path biased sampling, and multi-ancillary Amoeba MPPI.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{artifacts/images/experiments/final/static_success_clearance.png}
+  \caption{Final static generality comparison over ten BARN worlds and five
+  matched seeds per controller. Negative minimum clearance denotes a
+  footprint collision.}
+  \label{fig:final-static-generality}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.84\textwidth]{artifacts/images/experiments/final/world7_trajectory_comparison.png}
+  \caption{Matched world-7, seed-0 replay. Single-path Biased MPPI follows its
+  unique reference into a footprint collision, whereas geodesic Amoeba MPPI
+  takes the viable side of the terminal obstacle cluster and succeeds. The
+  blue body and flow are displayed only for Amoeba because they are inactive
+  in the single-path baseline.}
+  \label{fig:world7-trajectory}
+\end{figure}
+
+\subsection{Isolated reference-Python timing}
+
+Controller timing was measured sequentially, with no parallel workers, on
+critical worlds 7 and 48 and comfortable world 42. All controllers used seed
+0, 1024 samples, and a 56-step horizon. Vanilla, path-tracking, single-path
+biased, and Amoeba MPPI required mean update times of 31.45,ms, 109.60,ms,
+133.80,ms, and 147.97,ms, respectively. Their mean episode-level 95th
+percentiles were 35.25,ms, 115.98,ms, 166.20,ms, and 194.70,ms; the worst
+Amoeba update was 226.97,ms.
+
+Consequently, the synchronous NumPy reference does not satisfy a 20,Hz
+(50,ms) deployment budget. Amoeba adds 14.2,ms, or 10.6\%, over the closer
+single-path Biased MPPI baseline; much of the total latency is already incurred
+by path processing and the 1024-by-56 rollout batch. The deployment design
+therefore computes the geodesic field asynchronously at low rate and uses a
+vectorized C++ or GPU rollout path. These Python measurements characterize the
+research implementation and are not claimed as Nav2 plugin timing.
+
+\subsection{Offline learned pseudopod ranking}
+
+An optional learned extension retains deterministic collision-free geometry
+and predicts only context-dependent utility over feasible pseudopods. A shared
+CNN receives robot-centred occupancy, signed clearance, body, membrane,
+navigation-value, and candidate-mask channels; an MLP adds proposal and
+relative-goal features. Its utility score is made risk-aware using the
+auxiliary collision head,
+\begin{equation}
+  s_m^{\mathrm{safe}}
+  =\hat{s}_m-\beta\,\sigma(\hat{c}_m),
+  \qquad \beta=20,
+\end{equation}
+where $\sigma(\hat{c}_m)$ is predicted collision probability. The coefficient
+and checkpoint were frozen using validation worlds before blind evaluation.
+
+The dataset contains all 134 SLIP-feasible BARN worlds, split by complete
+world into 99 training, 18 validation, and 17 blind-test worlds. On 459 blind
+multimodal snapshots, the frozen ranker achieved 387/459 (84.3\%) oracle
+top-1 agreement, compared with 358/459 (78.0\%) for geometric promise. Mean
+surrogate utility regret decreased from 0.377 to 0.0156. The ranker selected
+9 collision-labelled candidates compared with 16 for the heuristic and
+avoided all seven cases in which the heuristic selected a colliding candidate
+despite the presence of a safe alternative.
+
+This is offline counterfactual ranking evidence, not closed-loop navigation or
+robot collision-rate evidence. The checkpoint is not allowed to command or
+reallocate MPPI samples. It has now been connected to the PyTorch controller in
+observation-only shadow mode: inference runs only during multimodal
+\code{ASSIST} cycles and logs the learned branch, geometric-promise branch,
+collision probabilities, agreement, and latency. The shadow result is excluded
+from sample allocation, MPPI costs, mode selection, and actuation. A
+same-seed regression test confirms exact command parity with shadow inference
+disabled. The next validation stage measures latency and online agreement on
+development worlds, followed---only if that gate passes---by a conservative
+blend with protected fallback and unchanged footprint rejection.
+
+The shadow panel passed on four development worlds: all paired outcomes and
+complete state traces were identical, while 1,245 multimodal cycles required a
+mean of 1.96\,ms for ranker inference. Learned and geometric choices agreed on
+63.3\% of those cycles. Consequently, a controlled allocation-only ablation is
+enabled. The frozen baseline divides the pseudopod budget equally; the new
+geometric policy uses reach-plus-navigation promise, and the conservative
+policy blends probabilities as
+\begin{equation}
+  \pi_m^{\mathrm{blend}}
+  =0.75\,\pi_m^{\mathrm{geo}}+0.25\,\pi_m^{\mathrm{learned}}.
+\end{equation}
+A 10\% uniform mixture floor prevents proposal starvation and 25\% of all
+samples remain reserved for the fallback. The learned output changes neither
+feasibility checks, trajectory costs, MPPI weighting, nor final mode selection.
+
+Across three seeds and four development worlds, every allocation policy
+completed all 12 episodes without collision. The initial one-seed advantage of
+the blend did not persist: relative to equal allocation, its mean completion
+time increased by 0.363\,s and mean minimum clearance decreased by
+4.6\,mm. Fully learned allocation reduced mean time by only 0.175\,s and mode
+switches by 0.25 while reducing clearance by 1.5\,mm. These small and
+inconsistent paired differences do not support a closed-loop improvement
+claim. Learned ranking is therefore retained as an exploratory negative
+ablation and observation-only extension; equal allocation remains the primary
+Amoeba configuration for the hybrid global-planner benchmark.
+
+Dynamic inspection revealed that periodic global replanning could adopt a
+partially executed local detour. Global replanning is therefore suspended while
+the hybrid gate is in \code{ASSIST}. In addition, pseudopod $m$ receives
+\begin{equation}
+ J_m^{\mathrm{rejoin}}
+ =w_d\,\overline{d}(\xi_m,\mathcal P)
+ +w_r\max\!\left(0,R_m(T)-R_{A^*}(T)\right),
+ \qquad (w_d,w_r)=(3,2),
+\end{equation}
+where $\overline d$ is mean lateral separation from protected path
+$\mathcal P$ and $R(T)$ is remaining path length at the rollout endpoint. The
+protected A* proposal has zero prior. This discourages locally safe but
+globally long pseudopods without disabling local assistance.
+
+The hybrid gate is additionally made predictive. For upcoming path point
+$p_i$ at arc length $s_i$, the estimated arrival time is
+\begin{equation}
+ t_i=\frac{s_i}{\max(|v|,v_{\min}^{\mathrm{gate}})},
+ \qquad v_{\min}^{\mathrm{gate}}=0.20\,\mathrm{m/s}.
+\end{equation}
+Assistance activates before a stall if, for any predicted obstacle $j$,
+\begin{equation}
+ \|p_i-\hat o_j(t_i)\|
+ \le r_{\mathrm{robot}}+r_j+\sigma t_i.
+\end{equation}
+Thus the safety cost may still command a stop when no bypass is feasible, but
+alternative pseudopod sampling begins before all nominal-path samples become
+unsafe.
+
+The global planner uses static map clearance; moving objects remain a local
+predictive responsibility. After eight-connected A*, line-of-sight
+shortcutting, and 5\,cm densification, deterministic Laplacian updates smooth
+the polyline. Each update is accepted only when its point and adjacent
+midpoints retain footprint clearance. The raw piecewise-linear A* path remains
+available as an ablation, and identical smoothing is used for vanilla and
+hybrid comparisons.
+
+For transient blockage, the mixture additionally contains an explicit
+zero-velocity waiting proposal. MPPI compares waiting with topology-distinct
+bypasses rather than stopping only as a side effect of collision penalties.
+Let $b_k$ denote the predicted corridor-blocked flag. Dynamic assistance
+returns to the protected path after
+\begin{equation}
+ b_{k-2}=b_{k-1}=b_k=0,
+\end{equation}
+without requiring displacement during the wait. The three-cycle confirmation
+suppresses chatter; the progress anchor and stall counter reset on release.
+
+\subsection{V8: Nav2 C++ integration}
+
+The C++ integration extends \code{nav2_mppi_controller}; it does not replace
+Nav2 path handling, critics, motion models, lifecycle management, or command
+constraints. Phase~1 introduced shadow-mode field construction and debug
+markers. Phase~2 enabled geodesic biasing while retaining a vanilla fallback.
+Phase~3 adds up to three pseudopod-derived, time-varying ancillary control
+sequences. With the current batch size $N=2000$, the ancillary fraction is
+$\alpha=0.20$, so at most 400 samples are divided among the active pseudopods
+and approximately 1600 samples retain ordinary Nav2 MPPI sampling. If
+$h_m$ is pseudopod $m$'s promise value, its normalized allocation is
+\begin{equation}
+  \pi_m = \frac{\exp(-h_m/\tau_p)}
+                 {\sum_j \exp(-h_j/\tau_p)},
+  \qquad \tau_p=0.75,
+\end{equation}
+followed by integer rounding that preserves the total ancillary budget.
+The current operating configuration uses
+\code{amoeba_shadow_mode=false}, \code{amoeba_bias_enabled=true},
+\code{amoeba_bias_strength=0.2}, and keeps the separate flow critic disabled.
+
+The field is still reconstructed synchronously. A later phase should move
+costmap/path processing to a 2--5\,Hz worker that publishes a timestamped,
+immutable snapshot for non-blocking consumption by the controller loop.
+
+\section{Nav2 port sketch}
+
+\begin{center}
+\fbox{\parbox{0.88\linewidth}{
+costmap and transformed/pruned global path\\
+$\downarrow$\\
+topology/ancillary construction (currently synchronous)\\
+$\downarrow$\\
+promise-weighted ancillary sample ranges plus vanilla fallback\\
+$\downarrow$\\
+Nav2 MPPI noise generation and motion prediction (15--20\,Hz)\\
+$\downarrow$\\
+existing Nav2 critics and footprint collision checks\\
+$\downarrow$\\
+existing MPPI update, constraints and output filtering
+}}
+\end{center}
+
+The current port provides sample ranges, pseudopod promises, ancillary paths,
+and debug visualization. The next implementation step is to collision-check
+the actual ancillary rollouts with Nav2's footprint/costmap machinery and
+publish those rollouts separately from their geometric reference centrelines.
+Stable mode IDs, per-mode warm starts, free energy/ESS telemetry, timestamps,
+and plan/costmap versioning remain desirable for the later asynchronous port.
+
+The visualization interface deliberately separates data by purpose:
+\code{/amoeba_debug} is a \code{MarkerArray} for the membrane and field,
+\code{/amoeba/ancillary_path_1} through \code{_3} are \code{nav_msgs/Path}
+reference centrelines, and \code{/trajectories} is a throttled batched
+\code{LINE_LIST} for MPPI samples. The ancillary topics require an RViz Path
+display, not a MarkerArray display.
+
+\section{Progress checklist}
+
+\begin{tabular}{p{0.10\linewidth}p{0.68\linewidth}p{0.14\linewidth}}
+\toprule
+\textbf{Version} & \textbf{Deliverable} & \textbf{Status} \\
+\midrule
+V0 & Single local geodesic-field-guided MPPI baseline & Complete \\
+V1 & Extract and visualize 2--3 topology-separated branches & Complete \\
+V2 & Convert each branch to a feasible full control mean & Complete \\
+V3 & Fixed grouped multimodal sampling & Complete \\
+V3.1 & Allocation, warm starts, commitment, and stability ablation & Complete \\
+V3.2 & Gated assistance and periodic global replanning & Complete \\
+V4 & Stable full-mixture importance correction & Complete \\
+V4.1 & Cycle-coherent ESS degeneracy guard & Complete \\
+V5 & Geometry-adaptive diagonal covariance and ablation & Complete \\
+V6 & Analytical SLIP skid-steer and footprint feasibility & Prototype \\
+V6.1 & Horizon-aware dynamic-obstacle prediction & Prototype complete \\
+V6.2 & Physical SLIP parameter identification & Pending \\
+V7 & Vanilla/path/Amoeba and dynamic-junction benchmark framework & Prototype complete \\
+V7.2 & Independent PyTorch execution and visualization port & Prototype complete \\
+V7.3 & Parallel global-route MPPI modes and long-horizon cooperative conflict prior & Prototype complete \\
+V8 & Nav2 C++ controller integration through Phase~3 & In progress \\
+\bottomrule
+\end{tabular}
+
+\section{Current conclusion}
+
+The sandbox has moved from a single-gradient geodesic bias to an explicit
+topology-informed multimodal proposal system. It can identify separate local
+routes, translate them into dynamically constrained controls, preserve them as
+separate MPPI sample groups, protect the global-path fallback, and apply a
+tested Gaussian-mixture importance correction. The first genuine multimodal
+V4 comparison exposed severe finite-sample degeneracy; the V4.1 ESS guard
+restored success by reverting coherently to V3 when corrected evidence was
+unreliable.
+
+The PyTorch reciprocal pilot now additionally retains several global A* route
+topologies as parallel, route-conditioned MPPI groups and evaluates eventual
+peer conflict over the remaining announced routes. This is an implemented
+prototype, not yet final evidence: route geometry is static within an episode,
+and dynamic space--time topology generation remains open.
+
+The project has now crossed from sandbox-only research into a working Nav2
+integration. This establishes the implementation path, but it is not yet the
+final thesis result. The central remaining question is whether topology-
+conditioned ancillary proposals outperform a strong vanilla/path-biased Nav2
+MPPI baseline in matched narrow and dynamic environments. Collision-validating
+the ancillary rollouts, recording actual allocation/selection telemetry, and
+running that benchmark are therefore higher priority than adding another
+visual feature. Fixed covariance with V3-style grouped sampling remains the
+trusted sandbox baseline, and raw V4 importance correction remains diagnostic
+until broader experiments establish an advantage.
+
+\end{document}

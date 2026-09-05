@@ -1,0 +1,19 @@
+# Python runtime and test caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Local environments and editor files
+.venv/
+*.swp
+*~
+
+# LaTeX build products (sources and PDFs remain visible)
+docs/*.aux
+docs/*.log
+docs/*.out
+docs/*.toc
+
+# Generated one-off output; curated results belong under artifacts/
+output/
+

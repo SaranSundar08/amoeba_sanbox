@@ -1,0 +1,4 @@
+scenario,config,seed,result,success,peer_collision,static_collision,time_s,path_length_m,minimum_peer_clearance_m,minimum_static_clearance_m,stall_time_s,final_goal_distance_m,assist_fraction,branch_fraction,mode_switches,repair_count,repair_failures,wall_time_s,controller_hz,controller_mean_ms,controller_p95_ms,controller_max_ms
+blocked_split,vanilla,0,static_collision,0,0,1,13.0,1.8461,0.7705,-0.0,5.15,4.5556,0.0,0.0,0,0,0,17.454,14.897,66.837,76.943,97.187
+blocked_split,path,0,peer_collision,0,1,0,16.7,2.6062,-0.0009,0.1,6.05,4.0575,0.0,0.0,0,0,0,41.008,8.145,122.497,135.887,159.447
+blocked_split,amoeba,0,success,1,0,0,29.25,7.5952,0.7257,0.1581,5.4,0.3443,0.9829059829059829,0.4905982905982906,2,0,0,85.635,6.831,146.141,175.496,209.587

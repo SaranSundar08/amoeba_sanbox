@@ -1,0 +1,2 @@
+scenario,config,runs,successes,success_rate,peer_collisions,static_collisions,timeouts,mean_success_time_s,mean_peer_clearance_m,worst_peer_clearance_m,mean_stall_time_s,mean_branch_fraction,mean_controller_hz
+blocked_split,repair,5,4,0.8,0,0,1,34.575,0.71662,0.7087,8.49,0.5210934110844526,8.868600000000002

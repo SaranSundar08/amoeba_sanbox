@@ -1,0 +1,7 @@
+scenario,config,runs,successes,success_rate,collisions,timeouts,mean_success_time_s,mean_success_path_m,mean_clearance_m,worst_clearance_m,mean_goal_progress_m,mean_stall_s,mean_controller_hz,mean_path_error_m
+static,vanilla,2,0,0.0,0,2,nan,nan,0.761,0.112,4.5724,0.0,480.04600000000005,0.30365
+static,path_mppi,2,0,0.0,0,2,nan,nan,0.555,0.1,6.37205,0.05,23.9265,0.03195
+static,amoeba,2,0,0.0,0,2,nan,nan,0.555,0.1,6.37205,0.05,17.236,0.03195
+dynamic,vanilla,2,0,0.0,0,2,nan,nan,0.1525,0.152,4.3804,0.8,160.127,0.29785
+dynamic,path_mppi,2,0,0.0,0,2,nan,nan,0.1605,0.091,5.3786000000000005,0.05,17.601999999999997,0.2188
+dynamic,amoeba,2,0,0.0,0,2,nan,nan,0.242,0.224,4.8232,0.775,13.164,0.2661

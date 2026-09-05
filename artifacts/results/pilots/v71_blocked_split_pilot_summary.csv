@@ -1,0 +1,4 @@
+scenario,config,runs,successes,success_rate,peer_collisions,static_collisions,timeouts,mean_success_time_s,mean_peer_clearance_m,worst_peer_clearance_m,mean_stall_time_s,mean_branch_fraction,mean_controller_hz
+head_on,vanilla,5,3,0.6,0,1,1,20.3,0.7081800000000001,0.0454,1.44,0.0,209.79019999999997
+head_on,path,5,3,0.6,0,2,0,28.21666666666667,0.51496,0.0061,2.3600000000000003,0.0,25.2252
+head_on,amoeba,5,4,0.8,0,0,1,36.949999999999996,0.7257999999999999,0.7159,8.58,0.6513853672658789,15.909199999999998

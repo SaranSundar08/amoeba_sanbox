@@ -1,0 +1,2 @@
+scenario,config,runs,successes,success_rate,collisions,timeouts,mean_success_time_s,mean_success_path_m,mean_clearance_m,worst_clearance_m,mean_goal_progress_m,mean_stall_s,mean_controller_hz,mean_path_error_m
+static,path_biased,50,45,0.9,5,0,19.85666666666667,8.673777777777776,0.25094,-0.025,8.441376,1.1940000000000002,7.227679999999999,0.0322

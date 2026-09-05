@@ -1,0 +1,5 @@
+config,world,seed,dynamic_seed,samples,horizon,prediction_horizon_s,uncertainty_rate_mps,result,success,time_s,path_len_m,min_clear_m,stall_s,wall_time_s,controller_hz,mode_switches,omega_sign_flips,branch_selection_fraction,mean_ess,min_ess,ess_guard_cycles,mean_path_error_m,max_path_error_m
+current,42,0,103000,256,56,2.0,0.03,collision,0,12.7,4.99,-0.003,0.4,15.144,16.772,9,18,0.2992125984251969,14.204520049747023,1.0,145,0.3228,0.9018
+predicted,42,0,103000,256,56,2.0,0.03,timeout,0,15.0,6.38,0.306,0.05,17.654,16.993,8,21,0.29333333333333333,13.167697567094502,1.0,196,0.4221,1.1121
+current,48,0,109000,256,56,2.0,0.03,timeout,0,15.0,5.83,0.147,0.05,17.171,17.471,6,10,0.28,18.741676939459154,1.0000182597996592,237,0.2646,0.9183
+predicted,48,0,109000,256,56,2.0,0.03,timeout,0,15.0,5.77,0.169,0.05,17.083,17.561,9,5,0.36333333333333334,17.538843638686767,1.0,228,0.3106,1.1161

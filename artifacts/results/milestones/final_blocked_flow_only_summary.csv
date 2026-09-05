@@ -1,0 +1,2 @@
+scenario,config,runs,successes,success_rate,peer_collisions,static_collisions,timeouts,mean_success_time_s,mean_peer_clearance_m,worst_peer_clearance_m,mean_stall_time_s,mean_branch_fraction,mean_controller_hz
+blocked_split,flow_only,5,2,0.4,1,2,0,36.875,0.13412,-0.0044,15.710000000000003,0.0,7.3648

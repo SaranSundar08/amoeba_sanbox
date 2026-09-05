@@ -1,0 +1,11 @@
+controller_max_ms,controller_mean_ms,controller_p95_ms,hypothesis_cvar_alpha,hypothesis_risk,minimum_inter_robot_clearance_m,minimum_moving_clearance_m,minimum_static_clearance_m,mode_switches,peer_prediction,reached_robot_1,reached_robot_2,result,robot_1_path_length_m,robot_1_reverse_distance_m,robot_2_path_length_m,robot_2_reverse_distance_m,seed,steps,success,time_s,total_path_length_m,total_reverse_distance_m,wall_time_s,world
+308.594,49.286,143.522,0.5,cvar,0.2069,,0.396,3,cv,1,1,success,10.049,0.97,8.724,0.0,0,574,1,28.7,18.773,0.97,49.089,93
+347.91,49.545,129.0,0.5,cvar,0.6985,,0.1249,72,hypotheses,0,0,timeout,8.826,1.401,8.423,1.721,0,1200,0,60.0,17.249,3.122,119.901,93
+304.083,50.615,147.35,0.5,cvar,0.1632,,0.5237,2,cv,1,1,success,9.172,0.323,8.78,0.0,1,484,1,24.2,17.952,0.323,44.916,93
+345.147,49.54,143.437,0.5,cvar,0.9282,,0.0546,4,hypotheses,1,1,success,9.814,1.118,8.94,0.0,1,568,1,28.4,18.755,1.118,49.259,93
+305.123,49.607,147.106,0.5,cvar,0.08,,0.6431,0,cv,1,1,success,9.059,0.0,8.543,0.0,2,420,1,21.0,17.603,0.0,40.049,93
+329.966,49.145,141.825,0.5,cvar,0.6695,,0.1488,6,hypotheses,1,1,success,9.395,0.072,13.719,0.083,2,745,1,37.25,23.114,0.156,62.358,93
+294.877,50.324,144.831,0.5,cvar,0.1211,,0.1554,14,cv,1,1,success,9.263,2.039,8.621,0.0,3,669,1,33.45,17.884,2.039,53.251,93
+316.27,48.867,141.525,0.5,cvar,0.8506,,0.062,4,hypotheses,1,1,success,10.285,1.287,9.081,0.0,3,623,1,31.15,19.365,1.287,53.379,93
+309.107,48.359,144.044,0.5,cvar,0.0641,,0.6003,2,cv,1,1,success,8.63,0.032,8.848,0.0,4,409,1,20.45,17.478,0.032,39.593,93
+328.141,50.163,141.769,0.5,cvar,0.8187,,0.0526,8,hypotheses,1,1,success,10.607,1.465,9.368,0.062,4,821,1,41.05,19.976,1.527,75.091,93

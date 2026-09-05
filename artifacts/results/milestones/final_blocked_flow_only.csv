@@ -1,0 +1,6 @@
+scenario,config,seed,result,success,peer_collision,static_collision,time_s,path_length_m,minimum_peer_clearance_m,minimum_static_clearance_m,stall_time_s,final_goal_distance_m,assist_fraction,branch_fraction,mode_switches,repair_count,repair_failures,wall_time_s,controller_hz,controller_mean_ms,controller_p95_ms,controller_max_ms
+blocked_split,flow_only,0,peer_collision,0,1,0,34.05,2.6364,-0.0044,0.1,25.2,4.0541,0.9853157121879589,0.0,0,0,0,93.513,7.282,137.082,148.167,180.009
+blocked_split,flow_only,1,success,1,0,0,37.6,8.8845,0.2167,0.025,11.15,0.3377,0.9867021276595744,0.0,0,0,0,103.621,7.257,137.554,149.89,184.909
+blocked_split,flow_only,2,static_collision,0,0,1,22.4,2.4343,0.1124,-0.0,16.3,4.2463,0.9776785714285714,0.0,0,0,0,61.482,7.287,136.99,148.079,176.439
+blocked_split,flow_only,3,success,1,0,0,36.15,8.9185,0.2299,0.0559,10.5,0.3492,0.9861687413554634,0.0,0,0,0,97.056,7.449,134.012,148.177,156.034
+blocked_split,flow_only,4,static_collision,0,0,1,22.6,2.4339,0.116,-0.0,15.4,4.2465,0.9778761061946902,0.0,0,0,0,59.876,7.549,132.239,143.83,149.024
