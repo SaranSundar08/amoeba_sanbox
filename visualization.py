@@ -20,6 +20,8 @@ YELLOW   = "#eda100"    # goal beacon
 ORANGE   = "#eb6834"    # sample fan (single hue, weight-graded alpha)
 STREAM   = "#1c5cab"    # water streamlines
 BRANCH_COLORS = ("#d33682", "#6c9f2f", "#8c5ac7")
+SPACETIME_WAIT   = "#00a99d"    # space-time "wait" route (spacetime.py)
+SPACETIME_DETOUR = "#ff6f3c"    # space-time "detour" route (spacetime.py)
 
 _BLUE_STEPS = ["#cde2fb", "#b7d3f6", "#9ec5f4", "#86b6ef", "#6da7ec",
                "#5598e7", "#3987e5", "#2a78d6", "#256abf", "#1c5cab",
@@ -192,9 +194,21 @@ def _draw_branches(ax, branches):
 
 
 def _draw_branch_proposals(ax, proposals):
-    """Draw V2 dynamically rolled means; dashed means failed feasibility."""
+    """Draw V2 dynamically rolled means; dashed means failed feasibility.
+
+    Space-time alternatives (`spacetime.py`, `branch_id` offset by +100
+    "wait" / +200 "detour" from their originating branch) get their own
+    fixed colors rather than `branch_id % len(BRANCH_COLORS)`, which would
+    otherwise wrap around and collide with an unrelated ordinary branch's
+    color (e.g. id 100 and id 1 landing on the same swatch).
+    """
     for proposal in proposals:
-        color = BRANCH_COLORS[proposal.branch_id % len(BRANCH_COLORS)]
+        if proposal.branch_id >= 200:
+            color = SPACETIME_DETOUR
+        elif proposal.branch_id >= 100:
+            color = SPACETIME_WAIT
+        else:
+            color = BRANCH_COLORS[proposal.branch_id % len(BRANCH_COLORS)]
         ax.plot(proposal.rollout[:, 0], proposal.rollout[:, 1], color=color,
                 lw=2.5, ls="-" if proposal.feasible else "--",
                 alpha=0.95 if proposal.feasible else 0.55, zorder=4.5)

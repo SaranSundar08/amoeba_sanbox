@@ -8,7 +8,7 @@ import numpy as np
 from env import CYL_R
 from visualization import (
     AQUA, BRANCH_COLORS, GREEN, GRIDLINE, INK, OBSTACLE, ORANGE, RED,
-    STREAM, SURFACE, VIOLET, YELLOW)
+    SPACETIME_DETOUR, SPACETIME_WAIT, STREAM, SURFACE, VIOLET, YELLOW)
 
 
 def _hex_rgb(color):
@@ -73,11 +73,16 @@ class PyQtGraphAnimator:
             self.global_path.setData(path[:, 0], path[:, 1])
         # One batched curve per visual role keeps updates fast while making
         # topology modes immediately distinguishable. Index 3 is the
-        # protected path/fallback (and the single-distribution fallback).
+        # protected path/fallback (and the single-distribution fallback);
+        # 4 and 5 are the space-time "wait"/"detour" alternatives
+        # (spacetime.py) -- dedicated roles rather than wrapping their
+        # branch_id (+100/+200) through `% len(BRANCH_COLORS)`, which would
+        # otherwise collide with an unrelated ordinary branch's fan colour.
         self.fan_curves = [
             self.plot.plot(pen=pg.mkPen(
                 (*_hex_rgb(color), 85), width=1))
-            for color in (*BRANCH_COLORS, ORANGE)
+            for color in (*BRANCH_COLORS, ORANGE, SPACETIME_WAIT,
+                         SPACETIME_DETOUR)
         ]
         self.branch_lines = [
             self.plot.plot(pen=pg.mkPen(
@@ -87,6 +92,18 @@ class PyQtGraphAnimator:
         self.proposal_lines = [
             self.plot.plot(pen=pg.mkPen(BRANCH_COLORS[index], width=3))
             for index in range(3)]
+        # Space-time alternatives (spacetime.py; branch_id offset by
+        # +100 "wait" / +200 "detour") get dedicated curves rather than
+        # competing with ordinary branches for the 3 proposal_lines slots
+        # -- sharing those would either silently drop a real branch or
+        # colour a wait/detour route the same as an unrelated branch.
+        # Only the single most prominent wait/detour is shown; several
+        # simultaneous ones (multiple crossing branches at once) collapse
+        # onto one curve each, a known display limitation.
+        self.spacetime_wait_line = self.plot.plot(pen=pg.mkPen(
+            SPACETIME_WAIT, width=3, style=QtCore.Qt.DashDotLine))
+        self.spacetime_detour_line = self.plot.plot(pen=pg.mkPen(
+            SPACETIME_DETOUR, width=3, style=QtCore.Qt.DashDotLine))
         self.plan = self.plot.plot(pen=pg.mkPen(GREEN, width=3))
         self.trace = self.plot.plot(pen=pg.mkPen(RED, width=3))
         self.heading = self.plot.plot(pen=pg.mkPen(INK, width=3))
@@ -181,7 +198,7 @@ class PyQtGraphAnimator:
         labels = info.get("mode_labels")
         if labels is None:
             fan_x, fan_y = _segments_xy(xs)
-            self.fan_curves[-1].setData(fan_x, fan_y)
+            self.fan_curves[3].setData(fan_x, fan_y)   # generic/fallback role
         else:
             sampled_labels = np.asarray(labels)[self.sample_indices]
             key_by_index = {
@@ -193,7 +210,14 @@ class PyQtGraphAnimator:
             global_peak = float(sampled_weights.max(initial=0.0))
             for index in np.unique(sampled_labels):
                 key = key_by_index.get(int(index), -1)
-                role = key % len(BRANCH_COLORS) if key >= 0 else 3
+                if key >= 200:
+                    role = 5
+                elif key >= 100:
+                    role = 4
+                elif key >= 0:
+                    role = key % len(BRANCH_COLORS)
+                else:
+                    role = 3
                 group = sampled_labels == index
                 role_segments[role].extend(xs[group])
                 # Selected/high-weight modes are vivid; alternatives remain
@@ -208,20 +232,31 @@ class PyQtGraphAnimator:
                 fan_x, fan_y = _segments_xy(segments)
                 strength = role_strength[role]
                 alpha = int(45 + 150 * np.clip(strength, 0.0, 1.0))
-                color = (BRANCH_COLORS[role] if role < 3 else ORANGE)
+                role_colors = (*BRANCH_COLORS, ORANGE, SPACETIME_WAIT,
+                              SPACETIME_DETOUR)
+                color = role_colors[role]
                 self.fan_curves[role].setPen(
                     self.pg.mkPen((*_hex_rgb(color), alpha), width=1))
                 self.fan_curves[role].setData(fan_x, fan_y)
 
-        for item in self.branch_lines + self.proposal_lines:
+        for item in (self.branch_lines + self.proposal_lines
+                    + [self.spacetime_wait_line, self.spacetime_detour_line]):
             item.setData([], [])
         for row, branch in enumerate(getattr(self.ctrl, "branches", [])[:3]):
             self.branch_lines[row].setData(
                 branch.centerline[:, 0], branch.centerline[:, 1])
-        for row, proposal in enumerate(
-                info.get("branch_proposals", [])[:3]):
+        proposals = info.get("branch_proposals", [])
+        ordinary = [p for p in proposals if p.branch_id < 100]
+        for row, proposal in enumerate(ordinary[:3]):
             self.proposal_lines[row].setData(
                 proposal.rollout[:, 0], proposal.rollout[:, 1])
+        for proposal in proposals:
+            if 100 <= proposal.branch_id < 200:
+                self.spacetime_wait_line.setData(
+                    proposal.rollout[:, 0], proposal.rollout[:, 1])
+            elif proposal.branch_id >= 200:
+                self.spacetime_detour_line.setData(
+                    proposal.rollout[:, 0], proposal.rollout[:, 1])
 
         current_path = getattr(self.ctrl, "path", self.path)
         if current_path is not None:

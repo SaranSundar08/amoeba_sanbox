@@ -108,6 +108,29 @@ def main():
     p.add_argument("--homotopy-monitor", action="store_true",
                    help="report mode-purity/distinctness statistics without "
                         "changing costs or commands")
+    p.add_argument("--spacetime-modes", action="store_true",
+                   help="add 'wait'/'detour' space-time alternatives "
+                        "(branch id +100/+200) when a predicted moving "
+                        "obstacle (--dynamic) crosses a branch's own "
+                        "corridor within --spacetime-horizon; requires "
+                        "--pseudopods/--grouped-sampling and --dynamic. See "
+                        "docs/experiments/SPACETIME_TOPOLOGY_PHASE0.md")
+    p.add_argument("--spacetime-horizon", type=float, default=None,
+                   help="--spacetime-modes: how far ahead the space-time "
+                        "search looks, in seconds (default: the controller's "
+                        "own T*dt)")
+    p.add_argument("--spacetime-dt-layer", type=float, default=0.25,
+                   help="--spacetime-modes: seconds between search time "
+                        "layers")
+    p.add_argument("--spacetime-res", type=float, default=0.10,
+                   help="--spacetime-modes: search grid resolution in "
+                        "metres (with --spacetime-dt-layer, sets the "
+                        "search's own implied speed)")
+    p.add_argument("--spacetime-window", type=float, default=1.0,
+                   help="--spacetime-modes: lateral room, in metres, for a "
+                        "detour route")
+    p.add_argument("--spacetime-obstacle-r", type=float, default=CYL_R,
+                   help="--spacetime-modes: assumed moving-obstacle radius")
     p.add_argument("--robot-model", choices=("ideal", "slip"),
                    default="ideal",
                    help="V6: shared prediction/simulation model")
@@ -192,10 +215,22 @@ def main():
         vkw["mode_switch_margin"] = args.switch_margin
         vkw["homotopy_w"] = args.homotopy_w
         vkw["homotopy_monitor"] = args.homotopy_monitor
+        if args.spacetime_modes:
+            if not args.dynamic:
+                p.error("--spacetime-modes requires --dynamic")
+            vkw["spacetime_modes"] = True
+            vkw["spacetime_dt_layer"] = args.spacetime_dt_layer
+            vkw["spacetime_res"] = args.spacetime_res
+            vkw["spacetime_window"] = args.spacetime_window
+            vkw["spacetime_obstacle_r"] = args.spacetime_obstacle_r
+            if args.spacetime_horizon is not None:
+                vkw["spacetime_horizon"] = args.spacetime_horizon
     elif args.importance_weighting:
         p.error("--importance-weighting requires --grouped-sampling")
     elif args.homotopy_w > 0.0 or args.homotopy_monitor:
         p.error("--homotopy-w/--homotopy-monitor require --grouped-sampling")
+    elif args.spacetime_modes:
+        p.error("--spacetime-modes requires --pseudopods/--grouped-sampling")
     if args.reference_policy == "nominal_fb":
         if not (args.pseudopods or args.grouped_sampling):
             p.error("--reference-policy nominal_fb requires --pseudopods or "
@@ -473,6 +508,10 @@ def main():
               f"{ctrl.selected_mode_name} "
               f"({weighting}, switches={ctrl.mode_switch_count}, "
               f"omega_sign_flips={ctrl.omega_sign_flips})")
+        if args.spacetime_modes:
+            print(f"space-time: {ctrl.spacetime_triggers} crossings "
+                  f"detected, {ctrl.spacetime_modes_added} wait/detour "
+                  f"modes added over the episode")
         if args.importance_ess_guard:
             evaluations = ctrl.importance_guard_mode_evaluations
             fallbacks = ctrl.importance_guard_mode_fallbacks
