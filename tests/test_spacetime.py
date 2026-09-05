@@ -11,8 +11,8 @@ import unittest
 import numpy as np
 
 from robot_model import RobotModel
-from spacetime import routes_are_distinct, spacetime_path_to_proposal, \
-    time_expanded_search, two_route_search
+from spacetime import nearest_crossing_obstacle, routes_are_distinct, \
+    spacetime_path_to_proposal, time_expanded_search, two_route_search
 
 
 class _OpenEnv:
@@ -274,6 +274,88 @@ class SpacetimePathToProposalTests(unittest.TestCase):
             0.3, T=56, dt=0.05, v_max=0.5, w_max=1.9,
             v_accel_max=1.0, w_accel_max=3.0)
         self.assertTrue(proposal.feasible)
+
+
+class _PredictingEnv:
+    """Minimal env exposing only `predicted_moving_obs`, matching
+    `dynabarn.DynaBarnEnv`'s signature -- lets `nearest_crossing_obstacle`
+    be tested without a real BARN world."""
+
+    def __init__(self, predict_fn, n_obstacles=1):
+        self._predict = predict_fn
+        self.n_obstacles = n_obstacles
+
+    def predicted_moving_obs(self, time_offsets, horizon=2.0):
+        times = np.asarray(time_offsets, dtype=float)
+        if self.n_obstacles == 0:
+            return np.zeros((len(times), 0, 2))
+        return self._predict(times)
+
+
+class NearestCrossingObstacleTests(unittest.TestCase):
+    def setUp(self):
+        self.reference = np.column_stack(
+            (np.zeros(20), np.linspace(0.0, 2.0, 20)))
+        self.times = (np.arange(20) + 1.0) * 0.05
+
+    def test_no_prediction_support_returns_none(self):
+        class _StaticEnv:
+            def clearance(self, pts):
+                return np.full(pts.shape[:-1], 10.0)
+
+        self.assertIsNone(nearest_crossing_obstacle(
+            _StaticEnv(), self.reference, self.times, 0.2, 0.15))
+
+    def test_zero_obstacles_returns_none(self):
+        env = _PredictingEnv(None, n_obstacles=0)
+        self.assertIsNone(nearest_crossing_obstacle(
+            env, self.reference, self.times, 0.2, 0.15))
+
+    def test_far_obstacle_returns_none(self):
+        env = _PredictingEnv(
+            lambda t: np.tile([[100.0, 100.0]], (len(t), 1, 1)))
+        self.assertIsNone(nearest_crossing_obstacle(
+            env, self.reference, self.times, 0.2, 0.15))
+
+    def test_crossing_obstacle_is_found_with_correct_margin(self):
+        # A stationary obstacle sitting exactly on the reference's
+        # midpoint -- co-located with the reference at every queried time,
+        # so it necessarily conflicts at the reference's own midpoint time.
+        mid_k = 9
+        mid_xy = self.reference[mid_k]
+        mid_t = self.times[mid_k]
+
+        def predict(t):
+            t = np.asarray(t)
+            return np.tile(mid_xy, (len(t), 1, 1))
+
+        env = _PredictingEnv(predict)
+        result = nearest_crossing_obstacle(
+            env, self.reference, self.times, 0.2, 0.15)
+        self.assertIsNotNone(result)
+        predict_fn, margin = result
+        self.assertLessEqual(margin, 0.0)
+        np.testing.assert_allclose(predict_fn(mid_t), mid_xy)
+
+    def test_selects_the_conflicting_obstacle_among_several(self):
+        far = np.array([50.0, 50.0])
+        mid_k = 9
+        conflicting = self.reference[mid_k]
+
+        def predict(t):
+            t = np.asarray(t)
+            return np.stack([
+                np.tile(far, (len(t), 1)),
+                np.tile(conflicting, (len(t), 1)),
+            ], axis=1)   # (T, 2 obstacles, 2)
+
+        env = _PredictingEnv(predict, n_obstacles=2)
+        result = nearest_crossing_obstacle(
+            env, self.reference, self.times, 0.2, 0.15)
+        self.assertIsNotNone(result)
+        predict_fn, _ = result
+        np.testing.assert_allclose(
+            predict_fn(self.times[mid_k]), conflicting)
 
 
 if __name__ == "__main__":

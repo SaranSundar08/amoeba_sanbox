@@ -243,8 +243,19 @@ understands geometry, not timing), and that feasibility is judged on the
 achieved rollout: a raw path with 0.2 m of paper clearance came out with
 -0.247 m once a tight turn-rate limit was honored, correctly flagged
 infeasible. Still not wired into `mppi.py`/`pseudopods.py` -- nothing yet
-decides when to call this or turns its output into a live `SamplingMode`;
-that decision layer is the next slice. 17 new tests, 86/86 overall. See
+decided when to call this or turned its output into a live `SamplingMode`
+-- that decision layer is now wired (2026-09-06):
+`MPPI._spacetime_alternatives`, called from `build_branch_proposals`,
+detects a predicted crossing against a branch's nominal-speed centreline
+continuation (not its short MPPI-horizon rollout -- a second "silently
+checks the wrong window" bug found and fixed the same way as the goal-
+reachability one above) and adds feasible wait/detour routes as extra
+modes (branch_id +100/+200), picked up automatically by `_sampling_modes`.
+Off by default, verified to leave `branch_proposals` untouched even with a
+real crossing present. 5 new integration tests
+(`tests/test_spacetime_integration.py`), 96/96 overall. Not yet validated
+against the existing dynamic scenarios, and the path fallback and multiple
+simultaneous obstacles remain unhandled. See
 `docs/experiments/SPACETIME_TOPOLOGY_PHASE0.md`.
 
 ## Homotopy-consistency cost and horizon-scale distinctness (2026-09-04)

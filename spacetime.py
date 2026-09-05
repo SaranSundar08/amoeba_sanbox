@@ -249,6 +249,54 @@ def routes_are_distinct(path_a, path_b, predict_obstacle, dt_layer=0.25,
     return False
 
 
+def nearest_crossing_obstacle(env, reference_xy, times, robot_r, obstacle_r,
+                              relevance=0.0):
+    """The single moving obstacle (if any) predicted to come within
+    `robot_r + obstacle_r + relevance` of `reference_xy` at the
+    SYNCHRONIZED time in `times` -- the trigger condition for generating a
+    space-time alternative to a branch reference that would otherwise
+    collide with a moving obstacle.
+
+    `reference_xy` is `(T, 2)`, `times` the matching `(T,)` absolute times
+    from now (e.g. `MPPI.prediction_times`). `relevance=0.0` (the default)
+    only triggers on a genuine predicted collision -- not "nearby" -- since
+    building a space-time alternative is only worth it when the existing
+    branch would actually fail. Returns `None` if `env` has no moving
+    obstacles (`predicted_moving_obs`) or none come this close, else
+    `(predict, margin)`: `predict(t) -> (x, y)` is a callable usable
+    directly by `time_expanded_search`/`two_route_search` (delegating to
+    `env`'s own prediction model, whatever it is, rather than re-deriving
+    one), and `margin` is the worst (most negative) predicted clearance,
+    for diagnostics.
+
+    Only ever selects ONE obstacle -- the most-conflicting one, if several
+    exist -- matching `time_expanded_search`'s single-obstacle limitation
+    (see `spacetime.py`'s module docstring). A branch threatened by two
+    obstacles at once is not yet handled distinctly from being threatened
+    by the worse of the two.
+    """
+    if not hasattr(env, "predicted_moving_obs"):
+        return None
+    reference_xy = np.asarray(reference_xy, dtype=float)
+    times = np.asarray(times, dtype=float)
+    predicted = env.predicted_moving_obs(times)         # (T, N, 2)
+    if predicted.shape[1] == 0:
+        return None
+    d = np.linalg.norm(reference_xy[:, None, :] - predicted, axis=-1)
+    margin = d - (robot_r + obstacle_r)
+    worst = np.unravel_index(np.argmin(margin), margin.shape)
+    worst_margin = float(margin[worst])
+    if worst_margin > relevance:
+        return None
+    obstacle_index = worst[1]
+
+    def predict(t):
+        return tuple(env.predicted_moving_obs(
+            np.array([t]))[0, obstacle_index])
+
+    return predict, worst_margin
+
+
 def spacetime_path_to_proposal(path, dt_layer, state, goal_xy, env,
                                robot_model, predict_obstacle, obstacle_r,
                                T=56, dt=0.05, v_max=0.5, w_max=1.9,

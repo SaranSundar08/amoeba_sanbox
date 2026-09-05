@@ -1,4 +1,4 @@
-# Space-time topology: Phase 0 (standalone mechanism)
+# Space-time topology: Phase 0 (standalone mechanism) and its first wiring
 
 Date: 2026-09-05 (or 06, depending on timezone at write time).
 
@@ -163,15 +163,70 @@ step cost, unlike the static flood's viscosity-weighted distance). The
 geometrically possible; a corridor narrower than the required detour width
 will correctly report the detour route infeasible rather than clip it.
 
+## The decision layer: wired into `MPPI.build_branch_proposals` (2026-09-06)
+
+`spacetime_modes=False` by default (no prior result changes; verified: with
+a genuine predicted crossing present but the flag off, `branch_proposals`
+is unchanged from the flag never having existed). When enabled,
+`MPPI._spacetime_alternatives(state, branch, base_proposal)` runs after
+each branch's ordinary reference is built:
+
+1. Check `env.predicted_moving_obs` (if the env has it) against the
+   branch's own nominal-speed continuation along its centreline, out to
+   `spacetime_horizon` -- NOT the base proposal's achieved rollout, and
+   not capped at the short MPPI horizon `T * dt`. Two real bugs surfaced
+   getting this right, both belonging to the same "runs fine, silently
+   checks the wrong window" class this week's other fixes guard against:
+   - The local goal for the search was first computed using `v_max`, but
+     `time_expanded_search`'s own implied speed is `res / dt_layer`
+     (coarser). A goal picked as "reachable at `v_max`" was routinely
+     *not* reachable by the search's own grid, making both routes
+     trivially infeasible for a reason having nothing to do with the
+     obstacle.
+   - The crossing check first used the base proposal's rollout, which is
+     capped at `T * dt` (the MPPI horizon, e.g. 1.5 s in testing) --
+     `spacetime_horizon` can be set much longer (6.0 s), but a crossing
+     that only matters beyond the short window was invisible no matter
+     how far the longer horizon was told to look.
+2. If a crossing is found, `two_route_search` runs from the current state
+   to a local goal along the branch's centreline (reachable at 90% of the
+   search grid's own speed within `spacetime_horizon` -- not the branch's
+   full, possibly distant endpoint, which `time_expanded_search` treats as
+   a hard arrival requirement rather than partial progress).
+3. Each feasible route (`wait`, `detour`) becomes an extra `BranchProposal`
+   via `spacetime_path_to_proposal`, with `branch_id` offset by +100/+200
+   from the original -- distinct from the -1 fallback and the small
+   non-negative ids `pseudopods.py` assigns, and stable across cycles so
+   warm-starting and dwell/switch hysteresis apply with no special-casing.
+
+Verified end to end on a synthetic crossing scenario
+(`tests/test_spacetime_integration.py`, 5 tests): disabled leaves
+`branch_proposals` untouched even with a real crossing present; enabled
+with no crossing adds nothing; a genuine crossing yields exactly `[0, 100,
+200]` as feasible proposals, picked up by `_sampling_modes` as ordinary
+modes (`[-1, 0, 100, 200]`), each carrying a `reference` so the existing
+homotopy-consistency cost applies to them with no extra wiring; and a
+10-step closed-loop episode with `grouped_sampling=True` runs to
+completion with finite commands throughout. One incidental finding along
+the way: the two routes' `two_route_search["distinct"]` flag can come out
+`False` even when they are procedurally different (one waits, one
+doesn't) -- a symmetric scenario let the search nudge both to the same
+side of the obstacle. This flag is diagnostic only; `_spacetime_alternatives`
+never gates on it, only on each route's own feasibility, so this doesn't
+block anything -- just don't read "not distinct" as "one route is
+redundant."
+
+Full suite: 96/96.
+
 ## Next slice
 
-`spacetime_path_to_proposal` produces a `BranchProposal`; nothing yet
-DECIDES when to call it or wires its output into a live `SamplingMode` in
-`mppi.py`/`pseudopods.py`. The next slice is that decision layer: detect
-when a predicted moving obstacle crosses an existing branch's (or the path
-fallback's) corridor within the planning horizon, run `two_route_search`
-from the current state to that branch's endpoint, and add whichever of
-"wait"/"detour" is feasible as an additional mode alongside the existing
-ones. Validate against the existing V6.1/V7.1 dynamic scenarios only after
-that integration, not before -- re-validating every dynamic result against
-a changed pseudopod definition is the bulk of the remaining effort.
+Still open: the path fallback (not just pseudopod branches) never gets a
+space-time alternative; multiple simultaneous moving obstacles collapse to
+"the single most-conflicting one" (`nearest_crossing_obstacle`'s documented
+limitation); and none of this has been validated against the existing
+V6.1/V7.1 dynamic scenarios yet, which is the bulk of the remaining effort
+-- re-validating every dynamic result against a controller that can now
+propose genuinely new modes, not just re-running them. Do that validation
+as its own declared experiment (a small matched panel, `spacetime_modes`
+on vs. off, on the existing dynamic/dynamic-blocked scenarios), not folded
+into unrelated work.

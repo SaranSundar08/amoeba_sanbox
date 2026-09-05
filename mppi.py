@@ -11,8 +11,10 @@ import time
 import numpy as np
 
 from homotopy import mode_side_planes, obstacle_set, side_violations
-from proposals import branch_to_control_sequence
+from proposals import _arc_length, _interpolate, branch_to_control_sequence
 from robot_model import RobotModel
+from spacetime import (nearest_crossing_obstacle, spacetime_path_to_proposal,
+                       two_route_search)
 from grouped_sampling import (
     SamplingMode, guard_importance_statistics, importance_mode_statistics,
     mixture_importance_weights, mode_statistics, project_control_sequences,
@@ -41,6 +43,9 @@ class MPPI:
                  reference_curvature_slowdown=1.2,
                  reference_clearance_slow_band=0.45,
                  reference_infeasible_fallback=False,
+                 spacetime_modes=False, spacetime_obstacle_r=0.075,
+                 spacetime_horizon=None, spacetime_dt_layer=0.25,
+                 spacetime_res=0.10, spacetime_window=1.0,
                  mode_switch_margin=0.3,
                  fallback_share=0.25, mode_warm_start=0.7,
                  mode_min_dwell=10, mode_confirm_cycles=3,
@@ -88,6 +93,21 @@ class MPPI:
         self.reference_infeasible_fallback = bool(reference_infeasible_fallback)
         self.reference_attempts = 0
         self.reference_fallbacks = 0
+        # Space-time topology (see spacetime.py, docs/experiments/
+        # SPACETIME_TOPOLOGY_PHASE0.md): when a branch's own reference would
+        # predictably collide with a moving obstacle, add "wait"/"detour"
+        # space-time alternatives as extra modes for that same branch
+        # endpoint, instead of relying on cost-shaped sampling noise to
+        # notice. Off by default -- no prior result changes.
+        self.spacetime_modes = bool(spacetime_modes)
+        self.spacetime_obstacle_r = float(spacetime_obstacle_r)
+        self.spacetime_horizon = (
+            T * dt if spacetime_horizon is None else float(spacetime_horizon))
+        self.spacetime_dt_layer = float(spacetime_dt_layer)
+        self.spacetime_res = float(spacetime_res)
+        self.spacetime_window = float(spacetime_window)
+        self.spacetime_triggers = 0
+        self.spacetime_modes_added = 0
         self.robot_model = RobotModel(
             kind=robot_model, radius=env.robot_r,
             footprint_length=footprint_length,
@@ -602,6 +622,92 @@ class MPPI:
                     proposal = shaped
                     self.reference_fallbacks += 1
             proposals.append(proposal)
+            proposals.extend(
+                self._spacetime_alternatives(state, branch, proposal))
         self.branch_proposals = proposals
         if hasattr(self, "proposal_ms"):
             self.proposal_ms.append((time.perf_counter() - t0) * 1e3)
+
+    def _spacetime_alternatives(self, state, branch, base_proposal):
+        """"Wait"/"detour" space-time alternatives for one branch (see
+        `spacetime.py`, `docs/experiments/SPACETIME_TOPOLOGY_PHASE0.md`),
+        if a moving obstacle is predicted to collide with the branch's own
+        reference within the planning horizon.
+
+        The search targets a point along the branch centreline reachable at
+        NOMINAL speed within the search horizon, not the branch's full
+        (possibly distant) endpoint: `time_expanded_search`'s goal is a hard
+        arrival requirement, unlike the receding-horizon partial-progress
+        tracking `branch_to_control_sequence` does, so handing it a
+        genuinely unreachable-in-time goal makes both routes trivially
+        infeasible regardless of the obstacle. Using the base proposal's
+        own (possibly obstacle-slowed) rollout endpoint instead would be
+        circular -- exactly the point being displaced by the obstacle it
+        needs to route around.
+
+        Returns zero, one, or two extra `BranchProposal`s, one per feasible
+        route. Their `branch_id` is the original id offset by
+        +100 ("wait") or +200 ("detour") -- distinct from the -1 fallback
+        and the small non-negative ids `pseudopods.py` assigns, and stable
+        across cycles for the same branch, so mode warm-starting and
+        dwell/switch hysteresis treat them exactly like any other mode
+        without special-casing. Only triggers off an already-feasible base
+        proposal: if the branch itself isn't viable there is nothing for a
+        space-time alternative to be an alternative TO.
+        """
+        if not self.spacetime_modes or not base_proposal.feasible:
+            return []
+        centerline = np.asarray(branch.centerline, dtype=float)
+        arc = _arc_length(centerline)
+        # 90% of the search grid's OWN straight-line reach (res / dt_layer,
+        # not v_max -- a coarser grid than the MPPI-implied speed makes even
+        # the direct, unobstructed route take longer than the horizon
+        # allows, failing "reachable in principle" for a reason that has
+        # nothing to do with the obstacle), leaving slack for any detour's
+        # extra distance or a wait's lost time.
+        search_speed = self.spacetime_res / self.spacetime_dt_layer
+        local_goal = _interpolate(
+            centerline, arc, 0.9 * search_speed * self.spacetime_horizon)
+
+        # Crossing detection must look as far ahead as the search itself
+        # (`spacetime_horizon`), not just the base proposal's own MPPI-
+        # horizon-limited rollout (`self.prediction_times`, capped at
+        # T * dt): a crossing that only matters beyond that shorter window
+        # would otherwise never be seen, no matter how far `spacetime_
+        # horizon` is set to look. Checked against the branch's own
+        # nominal-speed continuation along its centreline, not the base
+        # proposal's achieved (possibly slower) rollout, for the same
+        # reason the local goal isn't tied to that rollout either.
+        nk = int(round(self.spacetime_horizon / self.spacetime_dt_layer)) + 1
+        check_times = np.arange(nk) * self.spacetime_dt_layer
+        check_xy = _interpolate(
+            centerline, arc, search_speed * check_times).T
+        crossing = nearest_crossing_obstacle(
+            self.env, check_xy, check_times,
+            self.robot_model.planning_radius, self.spacetime_obstacle_r)
+        if crossing is None:
+            return []
+        self.spacetime_triggers += 1
+        predict, _margin = crossing
+        routes = two_route_search(
+            self.env, state[:2], local_goal, predict,
+            self.spacetime_obstacle_r, self.robot_model.planning_radius,
+            horizon=self.spacetime_horizon, dt_layer=self.spacetime_dt_layer,
+            res=self.spacetime_res, window=self.spacetime_window)
+        extras = []
+        for name, offset in (("wait", 100), ("detour", 200)):
+            route = routes[name]
+            if not route["feasible"]:
+                continue
+            proposal = spacetime_path_to_proposal(
+                route["path"], self.spacetime_dt_layer, state,
+                local_goal, self.env, self.robot_model, predict,
+                self.spacetime_obstacle_r, T=self.T, dt=self.dt,
+                v_max=self.v_max, w_max=self.w_max,
+                v_accel_max=self.v_accel_max, w_accel_max=self.w_accel_max,
+                initial_control=self.last_applied,
+                branch_id=branch.branch_id + offset)
+            if proposal.feasible:
+                extras.append(proposal)
+                self.spacetime_modes_added += 1
+        return extras
