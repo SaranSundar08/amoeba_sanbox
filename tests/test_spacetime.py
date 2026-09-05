@@ -10,8 +10,9 @@ import unittest
 
 import numpy as np
 
-from spacetime import routes_are_distinct, time_expanded_search, \
-    two_route_search
+from robot_model import RobotModel
+from spacetime import routes_are_distinct, spacetime_path_to_proposal, \
+    time_expanded_search, two_route_search
 
 
 class _OpenEnv:
@@ -180,6 +181,99 @@ class RoutesAreDistinctTests(unittest.TestCase):
         long = [(0.0, 0.3), (0.0, -0.3)]
         self.assertTrue(
             routes_are_distinct(short, long, obstacle, dt_layer=1.0))
+
+
+class SpacetimePathToProposalTests(unittest.TestCase):
+    """`spacetime_path_to_proposal` is the glue between Phase 0's raw
+    (x, y)-per-time-layer output and the `[T, 2]` control sequences the rest
+    of the pipeline consumes -- these pin its two load-bearing claims: a
+    wait segment survives resampling (unlike handing the same points to
+    `proposals.branch_to_control_sequence`, which only understands
+    geometry and would discard a repeated point as a zero-length segment),
+    and feasibility is judged on the ACHIEVED rollout, not the request."""
+
+    def setUp(self):
+        self.env = _OpenEnv()
+        self.model = RobotModel(kind="ideal", radius=0.2)
+        self.far = _FarAway()
+
+    def test_straight_path_is_tracked_and_feasible(self):
+        state = np.array([0.0, 0.0, np.pi / 2])
+        goal = np.array([0.0, 1.0])
+        path = [(0.0, 0.5 * t) for t in np.arange(9) * 0.25]
+        proposal = spacetime_path_to_proposal(
+            path, 0.25, state, goal, self.env, self.model, self.far, 0.3,
+            T=56, dt=0.05, v_max=0.5, w_max=1.9,
+            v_accel_max=1.0, w_accel_max=3.0)
+        self.assertTrue(proposal.feasible)
+        self.assertAlmostEqual(proposal.progress, 1.0, places=2)
+        self.assertLess(proposal.mean_tracking_error, 0.15)
+        self.assertEqual(proposal.controls.shape, (56, 2))
+        self.assertEqual(proposal.rollout.shape, (56, 3))
+
+    def test_wait_segment_survives_resampling_as_zero_velocity(self):
+        state = np.array([0.0, 0.0, np.pi / 2])
+        goal = np.array([0.0, 1.0])
+        # Hold at the start for 1.0 s (5 points at dt_layer=0.25), then move.
+        path = ([(0.0, 0.0)] * 5
+               + [(0.0, 0.5 * t) for t in np.arange(1, 9) * 0.25 - 1.0])
+        proposal = spacetime_path_to_proposal(
+            path, 0.25, state, goal, self.env, self.model, self.far, 0.3,
+            T=56, dt=0.05, v_max=0.5, w_max=1.9,
+            v_accel_max=1.0, w_accel_max=3.0)
+        wait_steps = int(round(1.0 / 0.05))
+        self.assertTrue(
+            np.allclose(proposal.controls[:wait_steps, 0], 0.0, atol=1e-9),
+            "commanded speed during the wait segment should be exactly "
+            "zero, not a discarded/collapsed segment")
+        self.assertTrue(proposal.feasible)
+
+    def test_feasibility_checks_the_achieved_rollout_not_the_request(self):
+        # A raw path that swerves away almost immediately -- safe on paper
+        # against an obstacle sitting on the original straight-ahead line --
+        # but a real robot with a very tight turn-rate limit cannot follow
+        # that swerve and keeps heading toward the obstacle instead.
+        state = np.array([0.0, 0.0, 0.0])
+        goal = np.array([1.0, 0.5])
+        model = RobotModel(kind="ideal", radius=0.1)
+        obstacle_xy = (0.5, 0.0)
+        obstacle_r = 0.15
+        predict = lambda t: obstacle_xy
+        path = [(0.05 * i, 0.5 if i >= 2 else 0.0) for i in range(20)]
+
+        raw_clear = np.min(np.linalg.norm(
+            np.asarray(path) - np.asarray(obstacle_xy), axis=-1)
+        ) - (obstacle_r + model.radius)
+        self.assertGreater(raw_clear, 0.0, "test setup: raw path must look "
+                           "safe, or this isn't testing what it claims to")
+
+        proposal = spacetime_path_to_proposal(
+            path, 0.05, state, goal, self.env, model, predict, obstacle_r,
+            T=40, dt=0.05, v_max=0.5, w_max=1.9, v_accel_max=1.0,
+            w_accel_max=0.3, initial_control=[0.3, 0.0])
+        self.assertFalse(proposal.feasible)
+        self.assertIn("clearance", proposal.reason)
+        self.assertLess(proposal.min_clearance, 0.0)
+
+    def test_prefers_exact_clearance_when_env_supports_it(self):
+        class _ObstacleEnv:
+            def __init__(self):
+                self.xmin, self.xmax = -5.0, 5.0
+
+            def clearance(self, pts):
+                return np.full(pts.shape[:-1], 10.0)
+
+            def obstacle_centers(self):
+                return np.zeros((0, 2)), 0.075
+
+        state = np.array([0.0, 0.0, np.pi / 2])
+        goal = np.array([0.0, 1.0])
+        path = [(0.0, 0.5 * t) for t in np.arange(9) * 0.25]
+        proposal = spacetime_path_to_proposal(
+            path, 0.25, state, goal, _ObstacleEnv(), self.model, self.far,
+            0.3, T=56, dt=0.05, v_max=0.5, w_max=1.9,
+            v_accel_max=1.0, w_accel_max=3.0)
+        self.assertTrue(proposal.feasible)
 
 
 if __name__ == "__main__":

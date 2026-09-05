@@ -27,6 +27,10 @@ import heapq
 
 import numpy as np
 
+from env import wrap
+from grouped_sampling import project_control_sequences
+from proposals import BranchProposal
+
 
 def _grid_origin(start_xy, goal_xy, window, res):
     """Grid bounds covering both endpoints plus `window` of lateral room
@@ -243,3 +247,106 @@ def routes_are_distinct(path_a, path_b, predict_obstacle, dt_layer=0.25,
         if np.dot(da, db) < 0.0:
             return True
     return False
+
+
+def spacetime_path_to_proposal(path, dt_layer, state, goal_xy, env,
+                               robot_model, predict_obstacle, obstacle_r,
+                               T=56, dt=0.05, v_max=0.5, w_max=1.9,
+                               v_accel_max=1.0, w_accel_max=3.0,
+                               initial_control=None, branch_id=-2,
+                               feasibility_margin=0.0, min_progress=0.05):
+    """Turn a `time_expanded_search` path into a `proposals.BranchProposal`
+    -- the missing piece connecting Phase 0's raw `(x, y)`-per-time-layer
+    output to the concrete `[T, 2]` velocity commands the rest of the
+    pipeline (`SamplingMode`, grouped sampling, MPPI cost) already consumes,
+    so a "wait" or "detour" space-time route can slot in as an ordinary
+    mode exactly like a static pseudopod branch.
+
+    `path` is spaced `dt_layer` apart starting at t=0 (as returned by
+    `time_expanded_search`/`two_route_search`); it is resampled onto the
+    controller's own `(T, dt)` grid by linear interpolation (holding the
+    final position beyond the path's own duration -- "already arrived,
+    waiting there"), which is exactly what preserves a WAIT segment
+    (repeated identical points interpolate to the same held position)
+    instead of collapsing it the way `proposals.branch_to_control_sequence`
+    would if handed the same points as a bare polyline: that function only
+    understands geometry, not timing, and treats repeated points as
+    zero-length segments to be discarded.
+
+    Velocity commands are the finite difference between consecutive
+    resampled points, then projected through the same box/rate limits
+    (`grouped_sampling.project_control_sequences`) every other proposal
+    uses, and rolled out through `robot_model.integrate` -- so, like
+    `branch_to_control_sequence`, the returned `rollout` is the ACHIEVED
+    trajectory under real dynamics and limits, not the raw requested path;
+    acceleration limits can make the two disagree, which is exactly why
+    feasibility is checked against the achieved rollout, not the request.
+
+    Feasibility checks the achieved rollout against static clearance
+    (`robot_model.exact_clearance` if `env` supports it, else
+    `robot_model.clearance`) AND the predicted moving obstacle at each
+    step's own absolute time -- a route that looked collision-free as a
+    plan can still clip the obstacle once acceleration limits distort it,
+    and this is what would catch that.
+    """
+    state = np.asarray(state, dtype=float)
+    goal_xy = np.asarray(goal_xy, dtype=float)
+    path_xy = np.asarray(path, dtype=float)
+    query_times = (np.arange(T) + 1.0) * dt
+    source_times = np.arange(len(path_xy)) * dt_layer
+    desired_xy = np.column_stack((
+        np.interp(query_times, source_times, path_xy[:, 0]),
+        np.interp(query_times, source_times, path_xy[:, 1])))
+
+    previous_u = (np.zeros(2) if initial_control is None
+                 else np.asarray(initial_control, dtype=float).copy())
+    previous_u[0] = np.clip(previous_u[0], 0.0, v_max)
+    previous_u[1] = np.clip(previous_u[1], -w_max, w_max)
+
+    raw = np.zeros((T, 2))
+    prev_point, prev_heading = state[:2].copy(), float(state[2])
+    for k in range(T):
+        delta = desired_xy[k] - prev_point
+        dist = float(np.linalg.norm(delta))
+        heading = float(np.arctan2(delta[1], delta[0])) if dist > 1e-9 \
+            else prev_heading
+        raw[k, 0] = dist / dt
+        raw[k, 1] = wrap(heading - prev_heading) / dt
+        prev_point, prev_heading = desired_xy[k], heading
+
+    controls = project_control_sequences(
+        raw[None], previous_u, dt, v_max, w_max, v_accel_max, w_accel_max)[0]
+
+    rollout = np.empty((T, 3))
+    x = state.copy()
+    for k in range(T):
+        x = robot_model.integrate(x, controls[k], dt)
+        rollout[k] = x
+
+    if hasattr(robot_model, "exact_clearance") and hasattr(
+            env, "obstacle_centers"):
+        static_clear = (robot_model.exact_clearance(env, rollout)
+                        - robot_model.extra_safety_margin(controls))
+    else:
+        static_clear = (robot_model.clearance(env, rollout)
+                        - robot_model.extra_safety_margin(controls))
+    obstacle_positions = np.array([predict_obstacle(t) for t in query_times])
+    dynamic_clear = (np.linalg.norm(rollout[:, :2] - obstacle_positions,
+                                    axis=-1)
+                     - obstacle_r - robot_model.radius)
+    min_clearance = float(np.min(np.minimum(static_clear, dynamic_clear)))
+
+    achieved = float(np.linalg.norm(state[:2] - goal_xy)
+                     - np.linalg.norm(rollout[-1, :2] - goal_xy))
+    tracking = float(np.mean(
+        np.linalg.norm(rollout[:, :2] - desired_xy, axis=-1)))
+
+    reasons = []
+    if min_clearance < feasibility_margin:
+        reasons.append("clearance")
+    if achieved < min_progress:
+        reasons.append("insufficient progress")
+    feasible = not reasons
+    return BranchProposal(
+        branch_id, controls, rollout, feasible, min_clearance, achieved,
+        tracking, "ok" if feasible else ", ".join(reasons))

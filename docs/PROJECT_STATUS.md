@@ -230,8 +230,22 @@ before they shipped: a deadline-based "two route" construction that silently
 degenerates to one dominant strategy (replaced with a wait-cost-variation
 construction, verified empirically to produce genuine wait-vs-detour
 routes), and a search grid sized only around the start position that
-silently clips a distant goal instead of erroring. 13 new tests, 82/82
-overall. See `docs/experiments/SPACETIME_TOPOLOGY_PHASE0.md`.
+silently clips a distant goal instead of erroring.
+
+Also added `spacetime_path_to_proposal`: converts a raw space-time path
+into a `proposals.BranchProposal` (resample onto the controller's `(T, dt)`
+grid, differentiate into velocity commands, project through the same
+box/rate limits every proposal uses, roll out, check feasibility) -- the
+glue needed for a space-time route to slot in as an ordinary mode. Verified
+a wait segment survives resampling as exactly zero commanded speed (would
+be silently discarded by `proposals.branch_to_control_sequence`, which only
+understands geometry, not timing), and that feasibility is judged on the
+achieved rollout: a raw path with 0.2 m of paper clearance came out with
+-0.247 m once a tight turn-rate limit was honored, correctly flagged
+infeasible. Still not wired into `mppi.py`/`pseudopods.py` -- nothing yet
+decides when to call this or turns its output into a live `SamplingMode`;
+that decision layer is the next slice. 17 new tests, 86/86 overall. See
+`docs/experiments/SPACETIME_TOPOLOGY_PHASE0.md`.
 
 ## Homotopy-consistency cost and horizon-scale distinctness (2026-09-04)
 

@@ -93,16 +93,64 @@ plan mismatch harness, and the peer-collision fix earlier this week --
 worth remembering as a standing hazard in this codebase's style of grid-
 indexed geometry.
 
+## The integration glue: `spacetime_path_to_proposal`
+
+Phase 0's search returns a bare `(x, y)`-per-time-layer list; the rest of
+the pipeline (`SamplingMode`, grouped sampling, MPPI cost) consumes
+`proposals.BranchProposal` objects: `[T, dt]`-gridded velocity commands
+under real box/rate limits, plus feasibility. `spacetime_path_to_proposal`
+is that conversion, so a "wait" or "detour" space-time route can slot in
+as an ordinary mode exactly like a static pseudopod branch.
+
+It cannot reuse `proposals.branch_to_control_sequence` for this: that
+function only understands geometry (a bare polyline via pure pursuit), not
+timing, and its "remove repeated grid points" step would discard a wait
+segment (consecutive identical points) as a zero-length segment -- exactly
+the information this conversion exists to preserve. Instead it resamples
+the path onto the controller's own `(T, dt)` grid by linear interpolation
+(holding the final position beyond the path's duration), differentiates
+consecutive points into raw velocity commands, and projects them through
+the same `grouped_sampling.project_control_sequences` every other proposal
+uses.
+
+Two claims mattered enough to verify empirically rather than trust on
+paper, both now regression-tested (`tests/test_spacetime.py`,
+`SpacetimePathToProposalTests`):
+
+- **The wait survives.** A path holding at the start for 1.0 s resamples to
+  *exactly* zero commanded speed for the corresponding 20 controller steps
+  (`dt=0.05`) -- not a discarded segment, not spurious drift.
+- **Feasibility is judged on what the robot actually does, not what the
+  route asked for.** A raw path that swerves away from an obstacle
+  immediately looks safe by a comfortable 0.2 m margin. Under a
+  deliberately tight turn-rate limit (`w_accel_max=0.3`), the achieved
+  rollout can't make that turn in time and keeps heading toward the
+  obstacle -- min clearance comes out at -0.247 m, correctly flagged
+  infeasible. This is the same failure mode the exact-footprint fix,
+  the plant/plan mismatch harness, and the peer-collision fix all guard
+  against elsewhere in the sandbox: a plan that looks fine until the real
+  dynamics are honored.
+
+Static clearance prefers `RobotModel.exact_clearance` when `env` supports
+it (falls back to the sampled `clearance()` otherwise, same convention as
+everywhere else this session); dynamic clearance checks the achieved
+rollout against `predict_obstacle` at each step's own absolute time,
+self-contained rather than routed through `env`'s own prediction machinery
+-- full integration with `DynaBarnEnv.predicted_clearance` is next-slice
+work, not done here.
+
 ## Tests
 
-`tests/test_spacetime.py`, 13 tests: collision-avoidance correctness under
+`tests/test_spacetime.py`, 17 tests: collision-avoidance correctness under
 both wait-cost regimes (exhaustive per-layer check, not spot checks); the
 wait-vs-detour emergent behavior above; a no-obstacle degenerate control;
 infeasibility handling (permanently-occupied goal, occupied start) returns
-`(None, inf)` rather than crashing or returning a colliding path; and direct
+`(None, inf)` rather than crashing or returning a colliding path; direct
 unit tests of `routes_are_distinct` on hand-built trajectories (opposite
 sides, same side, too-far-to-matter, and a short/held-position path
-correctly padded against a longer one). Full suite: 82/82.
+correctly padded against a longer one); and the two `spacetime_path_to_
+proposal` claims above (wait preserved, feasibility on the achieved
+rollout). Full suite: 86/86.
 
 ## Explicitly not yet done
 
@@ -117,11 +165,13 @@ will correctly report the detour route infeasible rather than clip it.
 
 ## Next slice
 
-Integrate `time_expanded_search` as an alternative reference-generation path
-for a branch when `dynabarn`-style prediction indicates a moving obstacle
-crosses that branch's corridor within the planning horizon, using the
-existing `BranchProposal`/`SamplingMode` machinery so a "wait" or "detour"
-space-time route becomes a real sampling mode, not a bolt-on cost term.
-Validate against the existing V6.1/V7.1 dynamic scenarios only after that
-integration, not before -- re-validating every dynamic result against a
-changed pseudopod definition is the bulk of the remaining effort.
+`spacetime_path_to_proposal` produces a `BranchProposal`; nothing yet
+DECIDES when to call it or wires its output into a live `SamplingMode` in
+`mppi.py`/`pseudopods.py`. The next slice is that decision layer: detect
+when a predicted moving obstacle crosses an existing branch's (or the path
+fallback's) corridor within the planning horizon, run `two_route_search`
+from the current state to that branch's endpoint, and add whichever of
+"wait"/"detour" is feasible as an additional mode alongside the existing
+ones. Validate against the existing V6.1/V7.1 dynamic scenarios only after
+that integration, not before -- re-validating every dynamic result against
+a changed pseudopod definition is the bulk of the remaining effort.
