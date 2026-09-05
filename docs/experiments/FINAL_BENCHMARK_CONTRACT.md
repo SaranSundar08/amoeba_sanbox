@@ -191,6 +191,34 @@ independent environment-level observations. An exact paired sign/McNemar test
 on the 45/5 split gives two-sided p=0.0625 and should not be overstated.
 Parallel-run timing remains diagnostic only.
 
+### Re-validated under the exact footprint check (2026-09-05)
+
+This matrix used `simulation.episode()`, which the 2026-09-04
+exact-footprint fix (`RobotModel.exact_clearance`) applies to automatically,
+unlike `v71_junction_benchmark.py`'s own loop. All 200 cases (vanilla,
+path_mppi, path_biased, amoeba) were re-run under the current code
+(`artifacts/results/milestones/final_static_generality_revalidated.csv`) and
+paired case by case against the frozen file above: **0/200 flips**. Every
+success/collision outcome is unchanged; the table's numbers stand as
+independently confirmed, not merely assumed, alongside the McNemar
+blocked-split result confirmed the same way.
+
+The re-run added `amoeba_nominal_fb` (the accepted horizon-scale-distinctness
+candidate from `REFERENCE_DISTINCTNESS.md`) to the same matrix:
+
+| method | success | collisions | mean successful time | mean clearance |
+|---|---:|---:|---:|---:|
+| `amoeba_nominal_fb` | 50/50 | 0 | 20.9 s | 0.262 m |
+
+**Identical to `amoeba` in every one of the 50 cases** (0/50 differ). This is
+expected, not a null result: this matrix's paths stay valid (ASSIST occupies
+only 2.0% of cycles, pseudopods are selected in 0%, per the paragraph above),
+so `nominal_fb`'s branch-reference speed policy has nothing to act on here.
+It says nothing about `nominal_fb`'s effect where branches actually matter
+(the blocked-path promotion gate already showed that: 21/24 to 22/24, see
+`docs/experiments/REFERENCE_DISTINCTNESS.md`) -- only that it does not
+disturb the ordinary-navigation case this matrix measures.
+
 ## Isolated serial timing protocol
 
 After freezing outcomes, measure computation separately on worlds 7, 48, and

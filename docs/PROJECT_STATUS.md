@@ -260,6 +260,16 @@ is testable only from here. See `docs/experiments/REFERENCE_DISTINCTNESS.md`.
 `nominal_fb` is the accepted candidate and remains opt-in; the shaped
 reference stays the default and no prior result changes.
 
+**Re-validated 2026-09-05.** The ten-world, five-seed static generality
+matrix (vanilla/path_mppi/path_biased/amoeba, the 25/50-39/50-45/50-50/50
+headline) was re-run under the exact-footprint fix: 0/200 paired cases
+flipped. `amoeba_nominal_fb` was added to the same matrix and is identical to
+`amoeba` in all 50 cases -- expected, since ASSIST/branch selection barely
+occurs in this matrix, not a claim about the blocked-path cases where
+`nominal_fb` actually differs. See
+`docs/experiments/FINAL_BENCHMARK_CONTRACT.md` and
+`artifacts/results/milestones/final_static_generality_revalidated.csv`.
+
 `nominal_fb` passed the four-scenario promotion gate (worlds 4/48/49, seeds
 0-1): 21/24 to 22/24 successes, no scenario regressed, dynamic improved 5/6
 to 6/6. One caveat: dynamic_blocked's count held at 4/6 but the failing cases
