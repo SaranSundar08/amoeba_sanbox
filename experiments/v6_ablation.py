@@ -30,7 +30,7 @@ CONFIGS = {
 
 def _run_case(case):
     (world, seed, radius, max_steps, scenario, lane, name, dynamic_seed,
-     n_moving, moving_speed, moving_amplitude, plant_mismatch) = case
+     n_moving, moving_speed, moving_amplitude, plant_mismatch, draw) = case
     env = _make_env(
         world, seed, radius, scenario, dynamic_seed, n_moving,
         moving_speed, moving_amplitude)
@@ -70,12 +70,18 @@ def _run_case(case):
     # its nominal model; the plant executes with independently jittered
     # yaw-gain and speed-yaw-loss. Only 'slip' has slip parameters to jitter,
     # so 'ideal' is unchanged, as is everything when the factor is 0.
+    # `draw` selects one of N independent mismatch draws per (world, seed):
+    # a 4-part seed sequence keeps every draw statistically independent (not
+    # just a different arithmetic offset into the same stream). This reseeds
+    # relative to the original n=1 pilot, so draw=0 here is a different
+    # (still valid, still reproducible) sample than that pilot's CSV, not a
+    # bit-identical replay of it.
     plant_model = None
     plant_yaw_gain = plant_speed_yaw_loss = np.nan
     if plant_mismatch > 0.0 and ctrl.robot_model.is_slip:
         plant_model = sample_plant_mismatch(
             ctrl.robot_model,
-            np.random.default_rng(world * 1000 + seed + 7),
+            np.random.default_rng([world, seed, draw, 7]),
             yaw_gain_range=(1.0 - plant_mismatch, 1.0 + plant_mismatch),
             speed_yaw_loss_range=(1.0 - plant_mismatch, 1.0 + plant_mismatch))
         plant_yaw_gain = plant_model.yaw_gain
@@ -91,6 +97,7 @@ def _run_case(case):
         "world": world,
         "seed": seed,
         "plant_mismatch": plant_mismatch,
+        "draw": draw,
         "plant_yaw_gain": plant_yaw_gain,
         "plant_speed_yaw_loss": plant_speed_yaw_loss,
         **metrics,
@@ -182,6 +189,13 @@ def main():
              "are scaled by uniform factors in [1-x, 1+x], unknown to the "
              "controller (0 = self-consistent plant, the original ablation)")
     parser.add_argument(
+        "--plant-mismatch-draws", type=int, default=1,
+        help="independent mismatch draws per (world, seed), reused across "
+             "all scenarios for that pair, same as the single-draw case "
+             "(default 1). Only takes effect when --plant-mismatch > 0; "
+             "ignored (fixed at one no-op draw) otherwise, since there is "
+             "nothing random to redraw with no mismatch.")
+    parser.add_argument(
         "--out", default="artifacts/results/milestones/v6_ablation.csv")
     args = parser.parse_args()
 
@@ -192,12 +206,14 @@ def main():
         parser.error("unknown scenario")
     if set(names) - set(CONFIGS):
         parser.error("unknown configuration")
+    draws = (range(args.plant_mismatch_draws) if args.plant_mismatch > 0.0
+             else range(1))
     cases = [
         (world, seed, args.radius, args.max_steps, scenario, args.lane,
          name, args.dynamic_seed, args.n_moving, args.moving_speed,
-         args.moving_amplitude, args.plant_mismatch)
+         args.moving_amplitude, args.plant_mismatch, draw)
         for scenario in scenarios for world in worlds
-        for seed in range(args.seeds) for name in names]
+        for seed in range(args.seeds) for name in names for draw in draws]
 
     rows = []
     if args.jobs == 1:
@@ -224,7 +240,7 @@ def main():
     config_order = {name: index for index, name in enumerate(names)}
     rows.sort(key=lambda row: (
         scenario_order[row["scenario"]], row["world"], row["seed"],
-        config_order[row["config"]]))
+        config_order[row["config"]], row["draw"]))
     out = os.path.abspath(args.out)
     os.makedirs(os.path.dirname(out), exist_ok=True)
     with open(out, "w", newline="") as stream:

@@ -593,3 +593,45 @@ dynamic obstruction, the proposal mixture contains a zero-velocity
 three consecutive predictions report the corridor clear, assistance exits
 without requiring the stationary robot to have made progress; the stall
 counter and anchor reset before A* tracking resumes.
+
+Plant/plan mismatch re-run at N=8 independent draws per case (was n=1).
+`experiments/v6_ablation.py` gained a `--plant-mismatch-draws` flag and a
+`draw` index reseeded per-draw via a 4-part seed sequence. Result overturns
+part of the n=1 pilot's headline: aggregate success rates still rise under
++-30% skid-parameter mismatch (as the pilot found), but 2 of the 10
+previously-100%-reliable baseline-success cases now show an occasional
+failure (`blocked` world 48 seed 1: 7/8 success; world 49 seed 0: 7/8
+success) -- the pilot's "every case matched or improved; none got worse"
+does not hold at N=8. Separately, 6 of the 14 baseline-collision cases show
+zero successes across all 8 draws despite clearances just as close to zero
+as the cases that do flip -- a structural weak point independent of plant
+mismatch, not a knife-edge one, and a candidate scenario set for the
+space-time-topology matched panel. See docs/experiments/PLANT_MISMATCH_N8.md.
+96/96 tests still pass.
+
+Method renamed Topology-Guided MPPI (TG-MPPI) per professor feedback;
+`docs/amoeba_mathematics_guide.tex` fully re-terminologized (flood region/
+body, topological branch, flood boundary, narrow-channel weight). Codebase
+identifiers and the ROS/Nav2 side are unchanged; that rename is deliberately
+deferred, not forgotten.
+
+Added `spacetime_flow.py`: a full (x, y, t) Dijkstra flood (`SpaceTimeFlood`),
+not just the two-route search `spacetime.py` already does. It is
+`spacetime.time_expanded_search`'s identical grid/cost function with the
+early "stop at goal" exit removed, so every reached cell keeps its true
+distance -- `G[i, j, k]`, the direct time-axis analogue of
+`env.LocalFlowField.D` -- rather than only the one path that happened to
+reach one goal. As a byproduct of checking free space directly rather than
+one predicted crossing, it also supports any number of simultaneous moving
+obstacles, which `time_expanded_search` does not (see that module's own
+"only ever selects ONE obstacle" limitation). 9 new tests
+(`tests/test_spacetime_flow.py`, 105/105 overall), including a direct
+consistency check against `two_route_search`'s own cost on an identical
+scenario. Standalone and NOT wired into `spacetime.py`, `mppi.py`, or
+`env.LocalFlowField` -- a full flood is `nx*ny*nk` cells versus the static
+flood's `nx*ny`, and unlike the static flood it can't be cached for many
+cycles since the obstacle predictions it floods against are only valid
+until the next re-prediction. Filed as future work ("generalize the
+per-branch wait/detour search into a fully-flooded space-time cost field"),
+not attempted before the Sept 13 sandbox freeze. Demo figures:
+`make_spacetime_flood_figure.py` (now built directly on the module).

@@ -26,9 +26,9 @@
 \newcommand{\dist}{\operatorname{dist}}
 \newcommand{\clip}{\operatorname{clip}}
 
-\title{Mathematics of the Geodesic Amoeba\\
-\large A Study Guide for Topology-Informed Biased MPPI}
-\author{Amoeba MPPI sandbox notes}
+\title{Mathematics of Topology-Guided MPPI\\
+\large A Geodesic Flood-Field Construction for Multimodal Biased MPPI}
+\author{Topology-Guided MPPI sandbox notes}
 \date{\today}
 
 \begin{document}
@@ -36,12 +36,16 @@
 
 \begin{abstract}
 This document develops the mathematical construction used to turn a local
-occupancy map into a geodesically reachable ``amoeba'', its membrane, and a
-small set of topology-distinct pseudopod centrelines. It deliberately
-separates physical reachability from navigation preference. The final section
-shows how a pseudopod becomes an ancillary control proposal for Biased MPPI.
-The equations describe the present discrete sandbox implementation; they are
-not a proof of full kinodynamic reachability.
+occupancy map into a geodesically reachable flood region, its outward
+boundary, and a small set of topology-distinct branch centrelines. It
+deliberately separates physical reachability from navigation preference. The
+final section shows how a branch becomes an ancillary control proposal for
+Biased MPPI. The equations describe the present discrete sandbox
+implementation; they are not a proof of full kinodynamic reachability.
+(For continuity with the accompanying codebase and demonstration videos,
+which predate this terminology, the implementation is internally named
+\texttt{amoeba\_sandbox}; this document uses geometry-first terminology
+throughout.)
 \end{abstract}
 
 \tableofcontents
@@ -50,7 +54,7 @@ not a proof of full kinodynamic reachability.
 \section{What the construction computes}
 
 Let $x_r=(p_r,\theta_r)$ be the robot state, with planar position
-$p_r=[x_r,y_r]^\top$. The amoeba pipeline computes
+$p_r=[x_r,y_r]^\top$. The construction pipeline computes
 \begin{equation}
 \text{obstacle map}
 \longrightarrow \F
@@ -59,17 +63,17 @@ $p_r=[x_r,y_r]^\top$. The amoeba pipeline computes
 \longrightarrow \{P_1,\ldots,P_M\}.
 \end{equation}
 Here $\F$ is collision-free position space, $\B_\rho$ is a local geodesic
-ball, $\M$ is its outward membrane, and $P_m$ is one pseudopod centreline.
-The stages answer different questions:
+ball, $\M$ is its outward flood boundary, and $P_m$ is one topological-branch
+centreline. The stages answer different questions:
 \begin{description}[leftmargin=3.1cm,style=nextline]
   \item[Body] Which nearby positions are connected to the robot through free
   space within a finite travel budget?
-  \item[Membrane] Where does that travel budget expire while free space
+  \item[Flood boundary] Where does that travel budget expire while free space
   continues?
-  \item[Navigation field] Which membrane exits appear useful for reaching the
-  global objective?
-  \item[Pseudopods] Which useful exits correspond to genuinely different
-  local routes?
+  \item[Navigation field] Which flood-boundary exits appear useful for
+  reaching the global objective?
+  \item[Topological branches] Which useful exits correspond to genuinely
+  different local routes?
 \end{description}
 
 \section{Discrete local grid}
@@ -78,7 +82,7 @@ The continuous plane is sampled on a square grid with resolution
 \begin{equation}
   \Delta r = 0.05\ \mathrm{m}.
 \end{equation}
-This is the distance between adjacent cell centres, not the amoeba radius.
+This is the distance between adjacent cell centres, not the flood-body radius.
 The grid coordinate $(i,j)$ represents
 \begin{equation}
   p_{ij}=
@@ -154,13 +158,14 @@ A* efficiently seeks one specified target using
 \begin{equation}
   f(p)=g(p)+h(p).
 \end{equation}
-The amoeba does not yet know its useful endpoints. It needs the distance to
-\emph{every} reachable local cell, so a single-source, all-destinations
-Dijkstra expansion is the natural operation. One result supports body
-construction, membrane detection, endpoint ranking, and branch backtracing.
-A* remains appropriate for the separate global start-to-goal plan.
+The construction does not yet know its useful endpoints. It needs the
+distance to \emph{every} reachable local cell, so a single-source,
+all-destinations Dijkstra expansion is the natural operation. One result
+supports body construction, flood-boundary detection, endpoint ranking, and
+branch backtracing. A* remains appropriate for the separate global
+start-to-goal plan.
 
-\section{The geodesic amoeba body}
+\section{The geodesic body}
 
 The body is the sublevel set of robot-centred geodesic distance:
 \begin{equation}
@@ -186,9 +191,9 @@ Equation~\eqref{eq:body} represents connected, collision-free
 acceleration, non-holonomic constraints, or skid-steer slip. Those are tested
 later when a branch is converted into a control sequence.
 
-\section{How the amoeba moves with the robot}
+\section{How the flood region moves with the robot}
 
-The amoeba is not a rigid shape translated with the robot. At rebuild cycle
+The flood region is not a rigid shape translated with the robot. At rebuild cycle
 $k$, the current robot position becomes a new geodesic source and the complete
 construction is repeated:
 \begin{equation}
@@ -200,7 +205,7 @@ construction is repeated:
   \label{eq:moving-rebuild}
 \end{equation}
 Consequently, nearby obstacles continually reshape the body and can create,
-merge, or remove pseudopods. In the sandbox the field is normally rebuilt
+merge, or remove topological branches. In the sandbox the field is normally rebuilt
 every five controller cycles. With $\Delta t=0.05\,\mathrm{s}$, that is a
 nominal rebuild interval of
 \begin{equation}
@@ -211,34 +216,34 @@ The MPPI loop uses the most recently built field between rebuilds.
 Figure~\ref{fig:amoeba-motion} is generated from a successful execution of the
 actual sandbox controller in BARN world 48. The pale-blue region is
 $\B_\rho$, cyan points show $\M$, blue arrows show descent of the navigation
-value, dotted coloured curves are extracted pseudopod centrelines, the black
+value, dotted coloured curves are extracted branch centrelines, the black
 disc is the robot, and red is the already driven trajectory.
 
 \begin{figure}[ht]
   \centering
   \includegraphics[width=\textwidth]{../artifacts/images/demos/amoeba_motion_sequence.png}
   \caption{Three implementation-derived snapshots of the rolling geodesic
-  amoeba. In open space (a), the body is broad. In clutter (b), obstacles
-  deform and split its reachable extensions, producing alternative
-  pseudopods. Near the goal (c), the goal lies inside the local body, so the
-  navigation field is seeded directly at the goal and no outward membrane
-  pseudopods are required. The apparent smooth cyan outline is a plotting
-  interpolation; all planning calculations use the underlying
-  $0.05\,\mathrm{m}$ grid.}
+  flood region. In open space (a), the body is broad. In clutter (b),
+  obstacles deform and split its reachable extensions, producing alternative
+  topological branches. Near the goal (c), the goal lies inside the local
+  body, so the navigation field is seeded directly at the goal and no
+  outward flood-boundary branches are required. The apparent smooth cyan
+  outline is a plotting interpolation; all planning calculations use the
+  underlying $0.05\,\mathrm{m}$ grid.}
   \label{fig:amoeba-motion}
 \end{figure}
 
-This sequence also clarifies what ``applied to the geodesic blob'' means. The
-plain reach-distance expansion decides the blue support region. The membrane
-boundary costs seed the second, viscosity-weighted flood inside that support.
-Its downhill directions rank and guide local continuation, while the distinct
-membrane backtraces provide the geometries later converted into ancillary
-control sequences.
+This sequence also clarifies what ``applied to the geodesic flood region''
+means. The plain reach-distance expansion decides the blue support region.
+The flood-boundary costs seed the second, narrow-channel-weighted flood
+inside that support. Its downhill directions rank and guide local
+continuation, while the distinct flood-boundary backtraces provide the
+geometries later converted into ancillary control sequences.
 
-\section{The outward membrane}
+\section{The outward flood boundary}
 
 Let $\mathcal{N}_8(p)$ denote the eight grid neighbours of $p$. The outward
-membrane is
+flood boundary is
 \begin{equation}
   \boxed{
   \M=
@@ -250,12 +255,12 @@ membrane is
   }
   \label{eq:membrane}
 \end{equation}
-Thus a membrane cell borders free space that the geodesic budget did not
-reach. A body cell adjacent only to an obstacle is not automatically a useful
-outward membrane cell. This distinction prevents wall boundaries from being
-mistaken for possible local exits.
+Thus a flood-boundary cell borders free space that the geodesic budget did
+not reach. A body cell adjacent only to an obstacle is not automatically a
+useful outward flood-boundary cell. This distinction prevents wall
+boundaries from being mistaken for possible local exits.
 
-\section{Membrane boundary cost: the ``promise'' value}
+\section{Flood-boundary cost: the ``promise'' value}
 
 When the goal lies outside the local body, the navigation flood cannot be
 seeded directly at the goal. Each $m\in\M$ is instead assigned a terminal
@@ -269,7 +274,7 @@ Without a global path,
   h(m)=\lVert m-p_g\rVert_2.
   \label{eq:goal-promise}
 \end{equation}
-This prefers membrane locations geometrically closer to the goal, but cannot
+This prefers flood-boundary locations geometrically closer to the goal, but cannot
 see obstacles beyond the local body.
 
 \subsection{Global-path boundary cost}
@@ -286,8 +291,8 @@ Then
   \label{eq:path-promise}
 \end{equation}
 The first term estimates reconnection cost; the second estimates the
-subsequent route to the goal. The global path ranks membrane exits but does
-not replace the true local free-space domain.
+subsequent route to the goal. The global path ranks flood-boundary exits but
+does not replace the true local free-space domain.
 
 \subsection{Small example}
 
@@ -299,10 +304,10 @@ Suppose exits $m_A$ and $m_B$ have
 Their estimated total costs are $7.2$ and $5.5$. Exit $m_B$ is preferred even
 though it is locally farther away, because it offers the better continuation.
 
-\section{Obstacle viscosity and the navigation field}
+\section{Obstacle narrow-channel weight and the navigation field}
 
 Physical reach and navigation preference are deliberately different. Define
-an obstacle-dependent viscosity
+an obstacle-dependent narrow-channel weight
 \begin{equation}
   \eta(p)=1+\alpha\,
   \clip\left(
@@ -310,7 +315,7 @@ an obstacle-dependent viscosity
   \right),
   \label{eq:viscosity}
 \end{equation}
-where $\alpha\geq0$ is viscosity strength and $b>0$ is the clearance band.
+where $\alpha\geq0$ is the weight strength and $b>0$ is the clearance band.
 Near inflated obstacles $\eta$ is large; in open space it approaches one.
 A weighted edge may be written
 \begin{equation}
@@ -327,36 +332,38 @@ The navigation value inside the body is the multi-source shortest-path field
   }
   \label{eq:navigation-field}
 \end{equation}
-Equivalently, every membrane cell is inserted into Dijkstra's priority queue
+Equivalently, every flood-boundary cell is inserted into Dijkstra's priority queue
 with initial value $h(m)$, and weighted distances propagate inward.
 The negative gradient $-\nabla D_g$ supplies a goal-seeking local direction.
 
 The separation is essential:
 \begin{align}
   d_r(p)&:\ \text{plain geodesic distance used for physical reach},\\
-  D_g(p)&:\ \text{viscosity-weighted value used for route preference}.
+  D_g(p)&:\ \text{narrow-channel-weighted value used for route preference}.
 \end{align}
-Using viscosity in $d_r$ would shrink the physical body precisely in narrow,
-high-resistance passages where forward visibility is important.
+Using the narrow-channel weight in $d_r$ would shrink the physical body
+precisely in narrow, high-resistance passages where forward visibility is
+important.
 
-\section{Pseudopod endpoint selection}
+\section{Branch endpoint selection}
 
-Every valid membrane cell is a potential endpoint. The implementation ranks
+Every valid flood-boundary cell is a potential endpoint. The implementation ranks
 candidates using
 \begin{equation}
   s(m)=D_g(m)+d_r(m).
   \label{eq:branch-score}
 \end{equation}
-On the seeded membrane $D_g(m)=h(m)$, so this balances estimated continuation
+On the seeded flood boundary $D_g(m)=h(m)$, so this balances estimated continuation
 and travel from the robot. Candidates within a score slack of the best value
 are considered. Spatial non-maximum suppression then requires
 \begin{equation}
   \lVert m_i-m_j\rVert_2\geq d_{\mathrm{end}}
 \end{equation}
 for retained endpoint candidates, avoiding many nearly identical endpoints
-on the same membrane arc.
+on the same flood-boundary arc.
 
 \section{Centreline tracing and topology filtering}
+\label{sec:centreline-topology}
 
 For each endpoint $m_i$, a centreline is traced toward the robot by repeatedly
 moving to a neighbouring cell with lower $d_r$:
@@ -378,13 +385,13 @@ space, the routes are treated as separated by an obstacle and therefore
 topologically distinct. This is a practical local test, not a formal homotopy
 proof.
 
-The output is at most $M$ pseudopods,
+The output is at most $M$ topological branches,
 \begin{equation}
   \{P_1,\ldots,P_M\},\qquad M\leq3,
 \end{equation}
 with IDs tracked between field rebuilds.
 
-\section{From pseudopod to ancillary controller}
+\section{From branch to ancillary controller}
 
 The geometry $P_m$ is converted by a branch-following policy $\mathcal A$ into
 a complete control-sequence mean:
@@ -392,6 +399,7 @@ a complete control-sequence mean:
   \mu_m=\mathcal A(P_m,x_0)
   =[u_{m,0},\ldots,u_{m,T-1}],
   \qquad u_{m,t}=[v_{m,t},\omega_{m,t}]^\top.
+  \label{eq:ancillary-mean}
 \end{equation}
 A schematic tracking law is
 \begin{align}
@@ -432,7 +440,7 @@ the full importance-corrected log weight is
    +\log p(U_k)-\log q(U_k).
   \label{eq:importance}
 \end{equation}
-The amoeba contribution is therefore upstream of MPPI weighting: it converts
+The topology-guided contribution is therefore upstream of MPPI weighting: it converts
 local free-space topology into the ancillary means $\mu_m$ in
 Equation~\eqref{eq:mixture}. Mode-conditioned updates preserve left/right
 route alternatives instead of averaging controls across an obstacle.
@@ -443,7 +451,7 @@ Equation~\eqref{eq:importance} is the formally corrected V4 alternative, but
 it is \emph{not} the estimator used for the frozen thesis results. The V4/V4.1
 ablations exposed severe finite-sample ESS collapse, so the final benchmark
 uses fixed covariance and the stable V3 grouped, mode-conditioned estimator.
-Let $\mathcal A_k$ be the feasible pseudopod modes exposed by the NORMAL/ASSIST
+Let $\mathcal A_k$ be the feasible branch modes exposed by the NORMAL/ASSIST
 gate at control cycle $k$, and let mode $0$ be the protected A*-path fallback:
 \begin{equation}
   \mathcal Q_k=\{0\}\cup\mathcal A_k,
@@ -457,7 +465,7 @@ If $M_k=|\mathcal A_k|>0$, the frozen NumPy allocation is
   \qquad N_m\simeq\pi_mN.
   \label{eq:frozen-allocation}
 \end{equation}
-If no pseudopod is exposed, $\pi_0=1$ and the complete batch samples the path
+If no branch is exposed, $\pi_0=1$ and the complete batch samples the path
 fallback. Within each fixed group, the uncorrected MPPI weights and free energy
 are
 \begin{align}
@@ -481,16 +489,18 @@ The control mean is updated \emph{only inside the selected topology}:
 Thus good left and right routes are never averaged into a control through the
 obstacle between them.
 
-The final comparators follow directly. Path-cost MPPI changes $S(U)$ but keeps
-ordinary nominal sampling. Single-path Biased MPPI uses only
-$q_0(U)=\N(U;\mu_{\mathrm{A*}},\Sigma)$ and samples the whole batch around the
-A*-derived ancillary mean. Full Amoeba uses that identical protected fallback
+The final comparators follow directly. Path-cost MPPI (\texttt{path\_mppi})
+changes $S(U)$ but keeps ordinary nominal sampling -- it is \emph{not} Biased
+MPPI, despite the similar name, since sampling itself is untouched.
+Single-path Biased MPPI (\texttt{path\_biased}) is the true literature
+comparator: it uses only $q_0(U)=\N(U;\mu_{\mathrm{A*}},\Sigma)$ and samples
+the whole batch around the A*-derived ancillary mean. Full TG-MPPI uses that identical protected fallback
 in NORMAL, and augments it with the topology-distinct $q_m$ components in
 ASSIST. Flow-only retains geodesic cost/bias but sets $\mathcal A_k=\varnothing$.
 
 \section{Parallel global-route topology extension}
 
-The local pseudopods above describe topology inside one rolling geodesic body.
+The local topological branches above describe topology inside one rolling geodesic body.
 The PyTorch reciprocal pilot now adds a second level: several global A* route
 topologies remain active as separate MPPI groups. Repeated penalized A*
 constructs
@@ -508,7 +518,7 @@ $\mu_{R_k}=\mathcal C(R_k,x_t,u_{t-1})$. The active label set becomes
  \qquad
  U_n\mid z_n=z\sim\N(\mu_z,\Sigma),
 \end{equation}
-where $\mathcal A_t$ contains local pseudopods, $\mathcal Y_t$ contains
+where $\mathcal A_t$ contains local topological branches, $\mathcal Y_t$ contains
 available wait/yield/reverse proposals, and $0$ is the nominal fallback.
 Route-labelled samples receive a tracking cost relative to their own $R_k$,
 not relative to the previously selected route. Conditional free energies
@@ -550,7 +560,7 @@ fraction. The ancillary budget and vanilla budget are
   N_a=\lfloor\alpha N\rfloor,\qquad N_0=N-N_a.
 \end{equation}
 Currently $N=2000$ and $\alpha=0.20$, giving at most 400 ancillary samples and
-approximately 1600 ordinary MPPI samples. For active pseudopod promise values
+approximately 1600 ordinary MPPI samples. For active branch promise values
 $h_m$, the allocation probabilities are
 \begin{equation}
   \pi_m=\frac{\exp(-h_m/\tau_p)}
@@ -571,18 +581,203 @@ configuration. The next safety requirement is explicit footprint/costmap
 validation of each ancillary mean and its realized rollout before treating it
 as a valid proposal component.
 
-\section{Amoeba-biased MPPI algorithm}
+\section{Space-time topology extension}
+\label{sec:spacetime}
+
+Every construction above floods free \emph{space}: a topological branch or
+global route is a curve through $\R^2$, and two curves are treated as distinct when
+an obstacle separates them at every shared point. A moving obstacle is not
+representable this way. It only enters through the MPPI cost as a
+time-indexed clearance term (\texttt{mppi.py}'s V6.1 prediction layer,
+documented in the companion progress notes,
+\texttt{docs/amoeba\_mppi\_progress.tex}), so ``wait for it to pass'' and
+``go before it arrives'' are never offered as candidate means $\mu_m$ --
+they must be discovered by sampling noise around whichever single branch
+mean already exists. This section formalizes flooding free
+\emph{space-time} instead, so a predicted obstacle's swept path becomes a
+tube that separates routes the same way a pillar does. This is the
+implemented mechanism (\texttt{spacetime.py}), not yet integrated with the
+geodesic body $\B_\rho$ above or the global-route extension $\mathcal R$: it
+operates on one topological branch or path reference at a time.
+
+\subsection{Time-expanded state space}
+
+Let $\Delta t_\ell$ be the time-layer spacing and $\Delta r_s$ the search's
+own spatial resolution, generally coarser than the flood's $\Delta r$. A
+state is a triple $(p,k)$, position $p\in\R^2$ at discrete time
+$\tau_k=k\Delta t_\ell$, $k=0,\ldots,K$, $K=\lfloor T_s/\Delta t_\ell\rfloor$
+for search horizon $T_s$. Transitions advance exactly one layer: an ordinary
+move $(p,k)\to(q,k+1)$ for $q\in\N_8(p)$, or a \emph{wait}
+$(p,k)\to(p,k+1)$. Because every transition advances $k$ by one regardless of
+whether $p$ changes, waiting costs real time exactly as moving does -- this
+is what lets ``wait'' be a genuine competing strategy rather than a free
+action.
+
+Let $\hat o(\tau)\in\R^2$ be one predicted obstacle's position at time $\tau$
+(e.g.\ \texttt{dynabarn.py}'s constant-velocity extrapolation from its last
+observed position and velocity) and $r_o$ its radius. A state is free when
+\begin{equation}
+  c(p)>r_p
+  \quad\text{and}\quad
+  \lVert p-\hat o(\tau_k)\rVert_2>r_p+r_o,
+  \label{eq:spacetime-free}
+\end{equation}
+the same static test as Equation~\eqref{eq:free} together with
+a synchronized-time exclusion disc around the predicted obstacle. A path
+$\pi=[(p_0,0),\ldots,(p_K,K)]$ is feasible when every state satisfies
+Equation~\eqref{eq:spacetime-free} and, for diagonal moves, both flanking
+orthogonal cells are free at the arriving layer (the same no-corner-cutting
+rule as the global A* planner).
+
+\subsection{Cost and the wait/detour construction}
+
+For a step $(p,k)\to(q,k+1)$, the cost is
+\begin{equation}
+  c(p,q)=
+  \begin{cases}
+    \Delta r_s\lVert q-p\rVert_2/\Delta r_s, & q\ne p,\\[2pt]
+    c_w, & q=p,
+  \end{cases}
+  \label{eq:spacetime-step-cost}
+\end{equation}
+and a path's cost is $\sum_k c(p_k,p_{k+1})$. The cheapest feasible path is
+found by Dijkstra over $(p,k)$ exactly as in Equation~\eqref{eq:reach-distance},
+now with the extra time coordinate.
+
+A first implementation attempted to build two distinct routes by bounding
+\emph{which} layer counts as arrival -- an early deadline
+$k\le k_{\max}$ or a late one $k\ge k_{\min}$. This degenerates: if reaching
+the goal safely is possible well before $k_{\min}$, the cheapest way to
+satisfy a late deadline is simply to arrive early and idle at the goal --
+physically the same route, wrongly labelled distinct. A deadline changes
+which path \emph{qualifies}, not which one is cheapest.
+
+Varying the wait cost $c_w$ changes which path \emph{is} cheapest, so it does
+not degenerate this way. Solving Equation~\eqref{eq:spacetime-step-cost} twice,
+once with $c_w=c_w^{\text{cheap}}$ (waiting favoured) and once with
+$c_w=c_w^{\text{expensive}}$ (moving favoured, so a lateral detour becomes
+the cheaper way to avoid the same obstacle), gives
+\begin{equation}
+  \pi_{\mathrm{wait}}=\Pi(c_w^{\text{cheap}}),\qquad
+  \pi_{\mathrm{detour}}=\Pi(c_w^{\text{expensive}}),
+  \label{eq:two-route}
+\end{equation}
+where $\Pi(c_w)$ denotes the Dijkstra solution under that wait cost. Verified
+on a synthetic crossing (one obstacle traversing the corridor once): the
+cheap-wait solution held position for several layers with a $0.2\,$m lateral
+excursion, while the expensive-wait solution never waited and swung $0.6\,$m
+to the side -- two genuinely different strategies, not a relabelling of one.
+
+\subsection{Synchronized-time distinctness}
+
+Section~\ref{sec:centreline-topology}'s distinctness test asks whether a
+connector between two static centrelines crosses dry space -- it compares
+positions with no notion of time. A moving obstacle only separates two
+routes that pass its location at genuinely \emph{different} times, so the
+comparison must synchronize on $\tau$. For paths $\pi_a,\pi_b$ (padded by
+holding the shorter one at its final position, the physical situation of
+having already arrived), define at each shared layer $k$
+\begin{equation}
+  d_a=p_{a,k}-\hat o(\tau_k),\qquad
+  d_b=p_{b,k}-\hat o(\tau_k).
+  \label{eq:spacetime-side-vectors}
+\end{equation}
+The routes are distinct when some layer with both $\lVert d_a\rVert_2$ and
+$\lVert d_b\rVert_2$ within a relevance radius $r_{\mathrm{rel}}$ satisfies
+\begin{equation}
+  d_a\cdot d_b<0,
+  \label{eq:spacetime-distinct}
+\end{equation}
+i.e.\ the obstacle sits between them at a moment when it is actually close to
+both -- the temporal analogue of Section~\ref{sec:centreline-topology}'s dry-
+space-crossing test, evaluated at synchronized time instead of position (this
+implementation's cost-based mode-purity term against a static obstacle uses
+the same side-of-obstacle principle, evaluated at closest approach instead of
+per step; see \texttt{homotopy.py}). This flag is diagnostic only: a
+symmetric scenario can let both routes drift to the same side of the
+obstacle (Equation~\eqref{eq:spacetime-distinct} false) while still being
+procedurally different (one holds position, the other does not), so
+$\{\pi_{\mathrm{wait}},\pi_{\mathrm{detour}}\}$ are offered as candidate
+modes on feasibility alone, never gated on Equation~\eqref{eq:spacetime-distinct}.
+
+\subsection{Trigger and local goal}
+
+Recomputing Equation~\eqref{eq:two-route} every cycle for every branch is
+unnecessary: it is only worth it when the existing reference $\mu_m$ would
+actually collide with a predicted obstacle. Extending $\mu_m$'s branch
+centreline at the search's own implied speed $v_s=\Delta r_s/\Delta t_\ell$
+gives a check trajectory $\{p(\tau_k)\}_{k=0}^{K}$ along the centreline arc
+length; the branch triggers a space-time alternative when
+\begin{equation}
+  \min_{k,\,j}\bigl[
+    \lVert p(\tau_k)-\hat o_j(\tau_k)\rVert_2-(r_p+r_{o,j})
+  \bigr]\le0
+  \label{eq:spacetime-trigger}
+\end{equation}
+for any tracked obstacle $j$ -- the worst (most negative) margin selects
+which single obstacle the search is built against, matching
+Equation~\eqref{eq:spacetime-free}'s single-obstacle exclusion test. The search
+target is not the branch's full, possibly distant endpoint -- which
+Equation~\eqref{eq:two-route} treats as a hard arrival requirement, unlike the
+receding-horizon partial-progress tracking $\mathcal A$ performs in
+Equation~\eqref{eq:ancillary-mean} -- but a point reachable at $90\%$ of $v_s$
+within the search horizon $T_s$, arc-length interpolated along the same
+centreline. Two evaluation windows -- the check trajectory here fixed at
+$v_s$, the search grid also implied speed $v_s$ -- must agree, or a goal
+picked as ``reachable'' or a crossing checked over the wrong horizon each
+silently return \emph{infeasible} or \emph{no trigger} for a reason that has
+nothing to do with the obstacle. Both failure modes were found empirically
+(the first goal-reachability mismatch, the first trigger window mismatch)
+before the mechanism ever produced a route.
+
+\subsection{Extending the proposal set}
+
+A feasible route from Equation~\eqref{eq:two-route} is resampled onto the
+controller's own grid $(T,\Delta t)$ by linear interpolation (holding the
+final position beyond the route's own duration), differenced into
+$[v,\omega]$ commands, and projected through the same box/rate limits as
+$\mathcal A$ in Equation~\eqref{eq:ancillary-mean} -- producing a mean
+$\mu_{m,\mathrm{wait}}$ or $\mu_{m,\mathrm{detour}}$ with exactly the same
+type as any other branch mean. Holding a wait segment through this
+resampling matters: collapsing repeated identical points as a zero-length
+segment (as $\mathcal A$ does for an ordinary polyline) would discard the one
+piece of information a wait route exists to carry. For a triggered branch
+$m$, the active label set of Equation~\eqref{eq:mixture} extends to
+\begin{equation}
+  \mathcal Z_t\leftarrow\mathcal Z_t\cup
+  \{m_{\mathrm{wait}},m_{\mathrm{detour}}\}\setminus
+  \{z:z\text{ infeasible}\},
+  \label{eq:spacetime-mode-extension}
+\end{equation}
+each with the same conditional weights and free energy as any other label
+(Equations~\eqref{eq:frozen-mode-evidence}--\eqref{eq:frozen-selected-update}),
+subject to the same minimum-dwell, improvement-margin, and multi-cycle
+confirmation hysteresis, with no special-casing.
+
+\subsection{Scope}
+
+Implemented for one topological branch against one predicted obstacle at a
+time: several simultaneous obstacles collapse to the single worst one in
+Equation~\eqref{eq:spacetime-trigger}, and the path fallback does not yet
+receive a space-time alternative. Verified on synthetic scenarios and, with
+default oscillating-obstacle settings, on real BARN worlds (dozens of
+triggers and added modes over a short episode on several development
+worlds); not yet validated against the existing dynamic-scenario benchmarks
+(V6.1/V7.1, \texttt{docs/amoeba\_mppi\_progress.tex}), which is required
+before any performance claim.
+
+\section{Topology-guided biased MPPI algorithm}
 
 Algorithm~\ref{alg:amoeba-mppi} gives the compact, paper-style construction
 corresponding to the guarded partial-batch Nav2 realization. The first part is
-evaluated at the amoeba-field update rate; the final sampling, rollout, and
+evaluated at the flood-field update rate; the final sampling, rollout, and
 weighting steps occur in each MPPI control cycle. The frozen NumPy estimator is
 given separately by Equations~\eqref{eq:frozen-allocation}--
 \eqref{eq:frozen-selected-update}; it selects and updates one mode rather than
 combining all modes in one Nav2 update.
 
 \begin{algorithm}[ht]
-\caption{Geodesic-Amoeba Ancillary Proposals for Biased MPPI}
+\caption{Geodesic Topology-Guided Ancillary Proposals for Biased MPPI}
 \label{alg:amoeba-mppi}
 \begin{algorithmic}[1]
 \Require Costmap $C$, robot state $x_r=(p_r,\theta_r)$, goal $p_g$,
@@ -631,8 +826,8 @@ S_k\gets\Call{Nav2Critics}{X^{(k)},U^{(k)}}$
 \end{algorithm}
 
 If the goal lies inside $\B_\rho$, the navigation value is seeded directly
-at the goal and the membrane-pseudopod proposal stage may be omitted. If no
-valid pseudopod remains, set $N_a=0$ and recover ordinary Nav2 MPPI. The
+at the goal and the flood-boundary branch proposal stage may be omitted. If no
+valid branch remains, set $N_a=0$ and recover ordinary Nav2 MPPI. The
 footprint-rejection line is included as the mathematically required gate; its
 complete integration into the current Nav2 port remains pending.
 
@@ -646,16 +841,16 @@ Symbol & Meaning \\
 \midrule
 $\Delta r$ & Grid resolution; currently $0.05\,\mathrm{m}$. \\
 $r_p$ & Circular planning-footprint proxy. \\
-$\rho$ & Amoeba geodesic reach; commonly $2.5\,\mathrm{m}$. \\
+$\rho$ & Geodesic flood reach; commonly $2.5\,\mathrm{m}$. \\
 $c(p)$ & Clearance from position $p$ to the nearest obstacle. \\
 $\F$ & Collision-free grid cells. \\
 $d_r(p)$ & Plain geodesic distance from the robot. \\
-$\B_\rho$ & Amoeba body, the $\rho$-sublevel set of $d_r$. \\
-$\M$ & Outward membrane where the geodesic budget expires. \\
-$h(m)$ & Membrane terminal cost-to-go estimate (``promise''). \\
-$\eta(p)$ & Obstacle-dependent viscosity. \\
-$D_g(p)$ & Viscosity-weighted navigation value inside the body. \\
-$P_m$ & Topology-distinct pseudopod centreline. \\
+$\B_\rho$ & Flood body, the $\rho$-sublevel set of $d_r$. \\
+$\M$ & Outward flood boundary where the geodesic budget expires. \\
+$h(m)$ & Flood-boundary terminal cost-to-go estimate (``promise''). \\
+$\eta(p)$ & Obstacle-dependent narrow-channel weight. \\
+$D_g(p)$ & Narrow-channel-weighted navigation value inside the body. \\
+$P_m$ & Topology-distinct branch centreline. \\
 $\mu_m$ & Ancillary control-sequence mean generated from $P_m$. \\
 $q_m(U)$ & MPPI proposal distribution conditioned on branch $m$. \\
 $R_k$ & Global route topology candidate $k$. \\
@@ -671,21 +866,21 @@ $J_k^{\mathrm{route\mbox{-}conflict}}$ & Long-horizon cooperative conflict prior
   \item Grid resolution $\Delta r$ controls numerical detail; geodesic reach
   $\rho$ controls the physical extent of the local body.
   \item Collision-free grid construction is shared costmap preprocessing; it
-  is not itself DWA, A*, or the amoeba novelty.
+  is not itself DWA, A*, or this method's novelty.
   \item Dijkstra is used because all local distances are needed. A* is used
   separately when one start-to-goal path is needed.
-  \item The body uses plain distance to represent reach. Viscosity affects
-  preference, not body membership.
+  \item The body uses plain distance to represent reach. The narrow-channel
+  weight affects preference, not body membership.
   \item A promise value is a terminal cost estimate, never a guarantee.
-  \item A membrane endpoint is not automatically a distinct route. Geometry
-  and dry-space separation are used to suppress equivalent branches.
+  \item A flood-boundary endpoint is not automatically a distinct route.
+  Geometry and dry-space separation are used to suppress equivalent branches.
   \item Geometric reachability is checked first; control and footprint
   feasibility are checked when generating the ancillary sequence.
 \end{enumerate}
 
 \section{Compact derivation}
 
-The complete amoeba-to-proposal construction can be summarized as
+The complete flood-to-proposal construction can be summarized as
 \begin{align}
   \F
   &=\{p:c(p)>r_p\},\\

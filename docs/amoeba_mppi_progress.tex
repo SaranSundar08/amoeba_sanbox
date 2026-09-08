@@ -1115,6 +1115,67 @@ LEFT/RIGHT/BEHIND/AHEAD space--time classes around changing obstacle
 predictions. Those are the next steps required before describing the method as
 a complete adaptation of topology-driven parallel trajectory optimization.
 
+\subsection{Space-time topology: Phase 0 and first wiring}
+
+A first, independent answer to the LEFT/RIGHT/BEHIND/AHEAD gap above now
+exists in the reference NumPy sandbox (\texttt{spacetime.py}), separate from
+the PyTorch reciprocal-pilot route machinery described above. It floods free
+\emph{space-time} rather than free space: a moving obstacle's predicted path
+becomes a tube in $(x,y,t)$ that a route can pass before, wait out, or detour
+around, giving those as genuinely distinct candidate modes instead of
+something MPPI can only discover via cost-shaped sampling noise around one
+existing branch mean. The full construction --- the time-expanded state
+space, the wait-cost-variation mechanism used to build two non-degenerate
+routes, the synchronized-time distinctness test, and the trigger/local-goal
+conditions --- is derived in
+\texttt{docs/amoeba\_mathematics\_guide.tex}, Section~``Space-time topology
+extension''; it is not repeated here.
+
+Wired into \texttt{mppi.py}'s \texttt{build\_branch\_proposals} as
+\texttt{\_spacetime\_alternatives}: when a predicted obstacle crosses a
+branch's own centreline continuation, a feasible ``wait'' and/or ``detour''
+route is added to that cycle's proposal set with a distinct, stable
+\texttt{branch\_id} (offset by $+100$/$+200$), so it is picked up automatically
+as an ordinary mode with no changes to mode selection. Off by default;
+confirmed to leave the proposal set unchanged even with a genuine predicted
+crossing present when disabled.
+
+Two implementation mistakes were found and fixed before this triggered at
+all, both instances of a check that runs, looks plausible, and silently
+answers the wrong question --- the same failure class as the exact-footprint
+and plant/plan-mismatch fixes earlier this cycle. First, an initial
+``two-route'' construction bounded which time layer counted as arrival
+(an early deadline or a late one); this degenerates whenever reaching the
+goal safely is already possible well before the late deadline, since the
+cheapest way to satisfy it is then simply to arrive early and idle --
+physically the same route, wrongly labelled distinct. Second, the local
+search goal was first computed using the controller's own $v_{\max}$, while
+the search grid's actual implied speed is $\Delta r_s/\Delta t_\ell$
+(generally coarser); a goal picked as reachable at $v_{\max}$ was often not
+reachable by the grid that had to reach it, and separately, the crossing
+\emph{detector} was first limited to the base proposal's short MPPI-horizon
+rollout, so a longer search horizon changed nothing because the detector
+never looked that far ahead. Fixed by (i) varying the relative cost of
+waiting versus detouring, verified to produce two routes that are genuinely
+different in a synthetic crossing scenario (one held position for five
+layers with a $0.2\,$m lateral excursion, the other never waited and swung
+$0.6\,$m aside), and (ii) checking the crossing against the branch's own
+nominal-speed centreline continuation, evaluated out to the full search
+horizon, rather than either the achieved rollout or $v_{\max}$.
+
+Verified end to end on a synthetic controller-level scenario (disabled
+leaves the proposal set untouched even with a crossing present; enabled with
+no crossing adds nothing; a genuine crossing yields exactly the expected
+extra modes, consumed correctly by mode selection; a short closed-loop
+episode with both space-time modes live completes with finite commands
+throughout) and, separately, confirmed to trigger in practice: a headless
+scan across several BARN worlds with default oscillating-obstacle settings
+found dozens of crossings and added modes over short episodes on most of
+them, not just in the hand-tuned synthetic test. Not yet validated against
+the V6.1 dynamic-obstacle and V7.1 dynamic-junction scenarios above, which
+changes what a mode \emph{is} and is required before any performance claim;
+the path fallback and multiple simultaneous obstacles remain unhandled.
+
 \subsection{Final blocked-path ancillary attribution}
 
 The final blocked-split experiment freezes the SLIP footprint, 1024 samples,
