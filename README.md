@@ -1,4 +1,11 @@
-# Amoeba MPPI sandbox
+# TG-MPPI sandbox
+
+*(Renamed from "Amoeba MPPI" per advisor feedback -- the method is
+bio-inspired but its foundations are geometric/mathematical, not a model of
+literal amoeba behavior. The codebase, ROS package, and file names below
+still use `amoeba`/`Amoeba` internally; that rename is deliberately
+deferred, separate work -- see `docs/amoeba_mathematics_guide.tex` for the
+first fully renamed document.)*
 
 NumPy prototype for a topology-informed, multimodal MPPI controller. Sandbox
 validation has progressed through V7.2, and the current work is the phased
@@ -45,9 +52,9 @@ motion phases. Results are written to
 `artifacts/results/milestones/v61_ablation_summary.csv`. Rendering is disabled so it
 cannot contaminate controller timing.
 
-## V7 vanilla versus Amoeba benchmark
+## V7 vanilla versus TG-MPPI benchmark
 
-The matched vanilla, path-only, and final-Amoeba comparison is run with:
+The matched vanilla, path-only, and final-TG-MPPI comparison is run with:
 
 ```bash
 python3 -m experiments.v7_benchmark --jobs 4
@@ -174,6 +181,25 @@ part of any banked benchmark result:
   (`spacetime_flow.py`'s `SpaceTimeFlood`) evaluated as a continuous cost
   every cycle, rather than only at trigger points. `spacetime_flow_w`
   defaults to `0.1` (see `mppi.py`'s comment for why 1.0 was too strong).
+
+`spacetime_modes`'s wait/detour routes past a moving obstacle, whose
+space-time "tube" tilts as it crosses the corridor:
+
+![Space-time topology: wait vs. detour routes past a moving obstacle, shown in both the (x, y) plan view and the full (x, y, t) volume](artifacts/images/demos/spacetime_topology.png)
+
+The static-obstacle case needs no time axis at all -- a fixed obstacle's
+tube is perfectly vertical, so the ordinary 2D branches already dodge it
+at every future instant for free:
+
+![Static topology: two branches splitting around a fixed pillar, and the same routes in (x, y, t) alongside the pillar's vertical tube](artifacts/images/demos/static_topology.png)
+
+`spacetime_flow.SpaceTimeFlood` floods the whole volume rather than
+searching for one or two routes through it -- the blob's own shape at
+each time layer, with a moving notch bitten out of it by the obstacle:
+
+![Filmstrip of the flooded region's shape at eight time layers, showing it expand then get a notch cut out of it by a moving obstacle](artifacts/images/demos/spacetime_flood_filmstrip.png)
+
+![The same flood slices stacked into one (x, y, t) volume, with the moving obstacle's tube threading through](artifacts/images/demos/spacetime_flood_volume.png)
 
 Both are mechanically correct and covered by unit/integration tests
 (`tests/test_spacetime.py`, `tests/test_spacetime_flow.py`,
