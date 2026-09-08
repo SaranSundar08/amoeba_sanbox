@@ -23,18 +23,20 @@ DYNAMIC_SEED = 71000
 
 
 def _run(case):
-    world, seed, flow = case
+    world, seed, flow, flow_w = case
     env = DynaBarnEnv(world, robot_r=0.34, n_moving=4, speed=0.4, amplitude=0.6,
                       seed=DYNAMIC_SEED + world * 1000 + seed)
     path = astar_path(env, env.start[:2], env.goal)
     ctrl = AmoebaHybrid(
         env, seed=seed, path=path, extract_branches=True, max_branches=3,
         grouped_sampling=True, dynamic_prediction=True,
-        spacetime_flow=flow, spacetime_flow_reflood_every=5,
+        spacetime_flow=flow, spacetime_flow_w=flow_w,
+        spacetime_flow_reflood_every=5,
         fallback_share=0.25, gate="auto", path_validity_gate=True)
     m = episode(env, ctrl, max_steps=1200)
     return dict(
-        world=world, seed=seed, spacetime_flow=flow, result=m["result"],
+        world=world, seed=seed, spacetime_flow=flow, flow_w=flow_w,
+        result=m["result"],
         success=m["success"], min_clear_m=m["min_clear_m"],
         time_s=m["time_s"], controller_mean_ms=m["controller_mean_ms"],
         controller_p95_ms=m["controller_p95_ms"])
@@ -43,11 +45,14 @@ def _run(case):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--jobs", type=int, default=8)
+    parser.add_argument("--flow-w", type=float, default=1.0,
+                        help="spacetime_flow_w for the flow=True arm")
     parser.add_argument(
         "--out",
         default="artifacts/results/milestones/spacetime_flow_matched_panel.csv")
     args = parser.parse_args()
-    cases = [(w, s, flow) for w in WORLDS for s in SEEDS for flow in (False, True)]
+    cases = [(w, s, flow, args.flow_w if flow else 1.0)
+             for w in WORLDS for s in SEEDS for flow in (False, True)]
     rows = []
     with concurrent.futures.ProcessPoolExecutor(max_workers=args.jobs) as pool:
         for row in pool.map(_run, cases):

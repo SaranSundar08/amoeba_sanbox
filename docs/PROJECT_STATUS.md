@@ -635,3 +635,41 @@ until the next re-prediction. Filed as future work ("generalize the
 per-branch wait/detour search into a fully-flooded space-time cost field"),
 not attempted before the Sept 13 sandbox freeze. Demo figures:
 `make_spacetime_flood_figure.py` (now built directly on the module).
+
+UPDATE 2026-09-08 (same day): wired it in anyway ("Option B"), as a
+declared experiment, not a production change. `mppi.py` gained
+`spacetime_flow=False` (opt-in) rebuilding a `SpaceTimeFlood` every
+`spacetime_flow_reflood_every` cycles (default 1) and adding
+`spacetime_flow_w * spacetime_flow_cost(xs)` to both cost-computation
+paths. `SpaceTimeFlood.dist_batch` added for vectorized K*T queries.
+114/114 tests (9 new: 3 `dist_batch`, 6 integration) confirm zero change
+when off. Profiled on real `AmoebaHybrid`+`DynaBarnEnv`: flood build
+~10-11ms at the sandbox's existing `spacetime_*` defaults, query <1ms for
+a full K=1024,T=56 batch; every-cycle rebuild costs ~+9% on the baseline
+controller time, every-5th-cycle ~+1%.
+
+First matched panel (6 worlds x 3 seeds, dynamic scenario, `flow_w=1.0`):
+mixed and NOT a clean win -- 17/18 vs 18/18 success (one regression:
+world 4 seed 1 turned a success into a timeout), clearance delta mean
+~0, 12/18 improved vs 5/18 worsened including two large regressions.
+Investigated the world-4/seed-1 case directly: not a hard stall -- the
+robot oscillates near one y-band for ~700 steps before self-resolving,
+consistent with the added cost term (magnitude ~6-14) being comparable
+in scale to the existing flow/track guidance cost, which at MPPI's sharp
+`lam=0.3` softmax temperature was enough to occasionally flip which
+near-tied sample wins, without being informative enough to reliably pick
+the better one. Swept `spacetime_flow_w` on that one case: 0.1 recovers
+success, 0.25/0.5 still time out. Re-ran the full 18-pair panel at
+`flow_w=0.1`: 18/18 vs 18/18 success (regression gone), clearance delta
+mean +0.014 (0.124 -> 0.138), median +0.005, 11/18 improved vs 7/18
+worsened. Paired Wilcoxon signed-rank test on the 18 deltas: p=0.316 --
+directionally positive, NOT statistically significant at this sample
+size. Default `spacetime_flow_w` changed to 0.1 to reflect this.
+Results: `artifacts/results/milestones/spacetime_flow_matched_panel.csv`
+(w=1.0) and `..._w0.1.csv` (w=0.1).
+
+Honest status: real, working, opt-in feature; directionally promising;
+not statistically validated; NOT enabled by default; not part of any
+banked generality/benchmark result. A larger-N panel (more seeds) would
+be needed before this could be reported as an actual improvement rather
+than a plausible one.

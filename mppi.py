@@ -47,7 +47,7 @@ class MPPI:
                  spacetime_modes=False, spacetime_obstacle_r=0.075,
                  spacetime_horizon=None, spacetime_dt_layer=0.25,
                  spacetime_res=0.10, spacetime_window=1.0,
-                 spacetime_flow=False, spacetime_flow_w=1.0,
+                 spacetime_flow=False, spacetime_flow_w=0.1,
                  spacetime_flow_reflood_every=1,
                  spacetime_flow_obstacle_r=0.075, spacetime_flow_horizon=None,
                  spacetime_flow_dt_layer=0.25, spacetime_flow_res=0.10,
@@ -119,6 +119,17 @@ class MPPI:
         # every cycle -- unlike `spacetime_modes` above, which only ever
         # adds two extra discrete candidates when a crossing is detected
         # on one branch. Off by default -- no prior result changes.
+        # `spacetime_flow_w=0.1` (not 1.0): at 1.0 the term is comparable
+        # in scale to the existing flow/track guidance cost, which at
+        # MPPI's fairly sharp `lam=0.3` softmax temperature was enough to
+        # occasionally tip a near-tied sample selection the wrong way --
+        # one matched-panel case (world 4, seed 1) turned a success into a
+        # 700-step stuck-then-timeout episode at w=1.0, fixed at w=0.1.
+        # First-pass matched panel at w=0.1 (18 world/seed pairs, dynamic
+        # scenario): 18/18 vs 18/18 success both arms (no more flips),
+        # mean clearance delta +0.014 (0.124 -> 0.138), but a paired
+        # Wilcoxon signed-rank test gives p=0.316 -- directionally
+        # positive, NOT statistically significant at this sample size.
         # Standalone/experimental: see docs/PROJECT_STATUS.md 2026-09-08.
         self.spacetime_flow = bool(spacetime_flow)
         self.spacetime_flow_w = float(spacetime_flow_w)
