@@ -673,3 +673,31 @@ not statistically validated; NOT enabled by default; not part of any
 banked generality/benchmark result. A larger-N panel (more seeds) would
 be needed before this could be reported as an actual improvement rather
 than a plausible one.
+
+UPDATE 2026-09-08 (later same day): ran the matched panel that was
+actually next on the pre-detour priority list -- `spacetime_modes` (the
+discrete, trigger-based wait/detour mechanism, integrated since the
+2026-09-06 session, never before benchmarked against real dynamic
+scenarios). Same 18 worlds/seeds as the `spacetime_flow` panel; the
+`spacetime_modes=False` arm is identical in every other parameter to that
+panel's `flow=False` arm, so those 18 baseline rows were reused rather
+than re-run (`experiments/spacetime_modes_matched_panel.py`).
+
+Result: 18/18 success both arms (no collisions, no timeouts either way),
+and the mechanism is genuinely active -- 2436 triggers and a substantial
+number of `spacetime_modes_added` across the panel, not dormant. But
+clearance impact is a wash-to-slightly-negative: 6/18 improved, 7/18
+worsened, 5/18 exactly unchanged, mean delta -0.0066, median 0.0000.
+Wilcoxon signed-rank p=0.195 -- not significant, and unlike `spacetime_
+flow`'s slight positive lean, this one leans (insignificantly) negative.
+Two moderate regressions worth a closer look if this is picked up again:
+world 42 seed 0 (-0.044) and seed 2 (-0.048). Results:
+`artifacts/results/milestones/spacetime_modes_matched_panel.csv`.
+
+Combined honest picture for both space-time mechanisms: mechanically
+correct, real, well-tested, firing as designed -- and NEITHER shows a
+statistically defensible improvement over the plain dynamic-prediction
+baseline at N=18. Both are legitimate future-work items with first-pass
+evidence attached, not results to cite as validated. Both mechanisms
+remain off by default; no existing benchmark or generality-matrix result
+is affected.
