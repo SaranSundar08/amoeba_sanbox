@@ -179,3 +179,27 @@ class SpaceTimeFlood:
         cell/layer); `inf` if unreached."""
         i, j = self._cell(xy)
         return float(self.G[i, j, self._layer(t)])
+
+    def dist_batch(self, pts, times):
+        """Vectorized `distance()` for a whole batch at once -- the form
+        MPPI actually needs: `pts` is `(..., 2)`, `times` is `(...,)`
+        broadcastable against `pts[..., 0]` (e.g. `pts` shaped `(K, T, 2)`
+        against `times` shaped `(T,)`, one absolute time per horizon step,
+        shared across all K samples). A per-point Python-loop call to
+        `distance()` is not an option here -- a single MPPI cycle queries
+        on the order of K*T points (tens of thousands).
+
+        Unreached points return `dmax + 2.0`, matching
+        `env.LocalFlowField.dist`'s convention: a large-but-finite penalty
+        that stays usable inside a cost sum instead of poisoning it with
+        `inf`.
+        """
+        pts = np.asarray(pts, dtype=float)
+        times = np.asarray(times, dtype=float)
+        i = np.clip(np.rint((pts[..., 0] - self.x0) / self.res).astype(int),
+                   0, self.nx - 1)
+        j = np.clip(np.rint((pts[..., 1] - self.y0) / self.res).astype(int),
+                   0, self.ny - 1)
+        k = np.clip(np.rint(times / self.dt_layer).astype(int), 0, self.nk - 1)
+        d = self.G[i, j, k]
+        return np.where(np.isfinite(d), d, self.dmax + 2.0)

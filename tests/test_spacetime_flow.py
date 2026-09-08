@@ -164,6 +164,38 @@ class MovingObstacleTests(unittest.TestCase):
         self.assertTrue(flood.reachable(k)[flood._cell((0.0, 0.3))])
 
 
+class DistBatchTests(unittest.TestCase):
+    def setUp(self):
+        self.flood = SpaceTimeFlood(_OpenEnv(), (0.0, 0.0), robot_r=0.2,
+                                    horizon=3.0, dt_layer=0.25, res=0.2,
+                                    window=2.0)
+
+    def test_matches_scalar_distance_pointwise(self):
+        pts = np.array([[0.0, 0.0], [0.0, 0.2], [0.0, 1.4]])
+        times = np.array([0.0, 0.5, 2.0])
+        got = self.flood.dist_batch(pts, times)
+        for k in range(len(pts)):
+            expected = self.flood.distance(pts[k], times[k])
+            expected = (expected if np.isfinite(expected)
+                       else self.flood.dmax + 2.0)
+            self.assertAlmostEqual(got[k], expected, places=9)
+
+    def test_broadcasts_shared_times_over_a_k_by_t_batch(self):
+        K, T = 5, 4
+        pts = np.zeros((K, T, 2))
+        pts[..., 1] = np.linspace(0.0, 0.3, T)  # same short path, every K
+        times = np.linspace(0.25, 1.0, T)
+        got = self.flood.dist_batch(pts, times)
+        self.assertEqual(got.shape, (K, T))
+        # Every K-row is identical (same points, same times).
+        self.assertTrue(np.allclose(got, got[0]))
+
+    def test_unreached_point_returns_dmax_plus_two_not_inf(self):
+        got = self.flood.dist_batch(np.array([[0.0, 100.0]]), np.array([0.0]))
+        self.assertTrue(np.isfinite(got[0]))
+        self.assertAlmostEqual(got[0], self.flood.dmax + 2.0, places=9)
+
+
 class ConsistencyWithTwoRouteSearchTests(unittest.TestCase):
     """The flood and `two_route_search` run the identical Dijkstra
     mechanics over the identical grid/cost function -- the only

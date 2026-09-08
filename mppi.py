@@ -15,6 +15,7 @@ from proposals import _arc_length, _interpolate, branch_to_control_sequence
 from robot_model import RobotModel
 from spacetime import (nearest_crossing_obstacle, spacetime_path_to_proposal,
                        two_route_search)
+from spacetime_flow import SpaceTimeFlood
 from grouped_sampling import (
     SamplingMode, guard_importance_statistics, importance_mode_statistics,
     mixture_importance_weights, mode_statistics, project_control_sequences,
@@ -46,6 +47,11 @@ class MPPI:
                  spacetime_modes=False, spacetime_obstacle_r=0.075,
                  spacetime_horizon=None, spacetime_dt_layer=0.25,
                  spacetime_res=0.10, spacetime_window=1.0,
+                 spacetime_flow=False, spacetime_flow_w=1.0,
+                 spacetime_flow_reflood_every=1,
+                 spacetime_flow_obstacle_r=0.075, spacetime_flow_horizon=None,
+                 spacetime_flow_dt_layer=0.25, spacetime_flow_res=0.10,
+                 spacetime_flow_window=1.0,
                  mode_switch_margin=0.3,
                  fallback_share=0.25, mode_warm_start=0.7,
                  mode_min_dwell=10, mode_confirm_cycles=3,
@@ -108,6 +114,26 @@ class MPPI:
         self.spacetime_window = float(spacetime_window)
         self.spacetime_triggers = 0
         self.spacetime_modes_added = 0
+        # Space-time FLOOD (see spacetime_flow.py): a full (x, y, t)
+        # distance field, evaluated as a continuous cost over every sample
+        # every cycle -- unlike `spacetime_modes` above, which only ever
+        # adds two extra discrete candidates when a crossing is detected
+        # on one branch. Off by default -- no prior result changes.
+        # Standalone/experimental: see docs/PROJECT_STATUS.md 2026-09-08.
+        self.spacetime_flow = bool(spacetime_flow)
+        self.spacetime_flow_w = float(spacetime_flow_w)
+        self.spacetime_flow_reflood_every = max(
+            1, int(spacetime_flow_reflood_every))
+        self.spacetime_flow_obstacle_r = float(spacetime_flow_obstacle_r)
+        self.spacetime_flow_horizon = (
+            T * dt if spacetime_flow_horizon is None
+            else float(spacetime_flow_horizon))
+        self.spacetime_flow_dt_layer = float(spacetime_flow_dt_layer)
+        self.spacetime_flow_res = float(spacetime_flow_res)
+        self.spacetime_flow_window = float(spacetime_flow_window)
+        self._spacetime_flood = None
+        self._spacetime_flood_age = 0
+        self.spacetime_flow_build_ms = []
         self.robot_model = RobotModel(
             kind=robot_model, radius=env.robot_r,
             footprint_length=footprint_length,
@@ -172,8 +198,42 @@ class MPPI:
             prediction_horizon=self.prediction_horizon,
             uncertainty_rate=self.prediction_uncertainty_rate)
 
+    def _maybe_rebuild_spacetime_flood(self, state):
+        """Rebuild the full (x, y, t) flood every `spacetime_flow_
+        reflood_every` cycles (default: every cycle) -- see
+        `spacetime_flow.SpaceTimeFlood`. No-op unless `spacetime_flow` is
+        on, so every existing result/config is completely unaffected by
+        this method's existence."""
+        if not self.spacetime_flow:
+            return
+        self._spacetime_flood_age += 1
+        if (self._spacetime_flood is not None
+                and self._spacetime_flood_age % self.spacetime_flow_reflood_every):
+            return
+        t0 = time.perf_counter()
+        self._spacetime_flood = SpaceTimeFlood(
+            self.env, state[:2], robot_r=self.robot_model.planning_radius,
+            obstacle_r=self.spacetime_flow_obstacle_r,
+            horizon=self.spacetime_flow_horizon,
+            dt_layer=self.spacetime_flow_dt_layer, res=self.spacetime_flow_res,
+            window=self.spacetime_flow_window)
+        self.spacetime_flow_build_ms.append((time.perf_counter() - t0) * 1e3)
+
+    def spacetime_flow_cost(self, xs):
+        """Continuous space-time-flood attraction-away-from-danger cost,
+        the same "goal_w * final + run_w * mean" shape `goal_cost` and
+        `_FlowGuidedMPPI.goal_cost`'s flow term already use, just reading
+        `SpaceTimeFlood.dist_batch` instead of `LocalFlowField.dist`.
+        Zero when disabled or before the first flood is built (e.g. the
+        very first cycle, or a `predicted_moving_obs`-free env)."""
+        if not self.spacetime_flow or self._spacetime_flood is None:
+            return 0.0
+        d = self._spacetime_flood.dist_batch(xs[..., :2], self.prediction_times)
+        return self.goal_w * d[:, -1] + self.run_w * d.mean(1)
+
     def step(self, state):
         self.prepare(state)
+        self._maybe_rebuild_spacetime_flood(state)
         if self.grouped_sampling:
             return self._step_grouped(state)
         noise = self.rng.normal(size=(self.K, self.T, 2)) * self.std
@@ -189,7 +249,8 @@ class MPPI:
         soft = np.clip(safety - clear, 0.0, None)
         costs = (collided * self.collision_cost
                  + self.repulse_w * soft.sum(1)
-                 + self.goal_cost(xs))
+                 + self.goal_cost(xs)
+                 + self.spacetime_flow_w * self.spacetime_flow_cost(xs))
 
         w = np.exp(-(costs - costs.min()) / self.lam)
         w /= w.sum()
@@ -210,7 +271,8 @@ class MPPI:
         soft = np.clip(safety - clear, 0.0, None)
         return (collided * self.collision_cost
                 + self.repulse_w * soft.sum(1)
-                + self.goal_cost(xs))
+                + self.goal_cost(xs)
+                + self.spacetime_flow_w * self.spacetime_flow_cost(xs))
 
     def _sampling_modes(self, state):
         """Feasible V2 branches plus an always-present V0-style fallback."""
