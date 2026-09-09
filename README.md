@@ -10,8 +10,8 @@ first fully renamed document.)*
 NumPy prototype for a topology-informed, multimodal MPPI controller. Sandbox
 validation has progressed through V7.2, and the current work is the phased
 Nav2 C++ port. The port has progressed through observer-only integration to
-Phase 3: a finite geodesic body selects up to three membrane pseudopods, turns
-them into time-varying ancillary controls, and assigns a promise-weighted part
+Phase 3: a finite geodesic flood body selects up to three topological branches
+(pseudopods) from its boundary, turns them into time-varying ancillary controls, and assigns a promise-weighted part
 of the MPPI sample batch to those distinct modes. Ordinary Nav2 MPPI samples
 remain in the batch as the protected fallback; the flow critic is still held
 off while ancillary sampling is validated independently.
@@ -126,7 +126,7 @@ python3 run.py --controller hybrid --world 48 --radius 0.34 \
   --grouped-sampling --adaptive-covariance --gate auto \
   --nav2-path-validity --replan-every 1.0 --animate
 
-# Horizon-scale distinct pseudopod references (accepted candidate, opt-in;
+# Horizon-scale distinct branch references (accepted candidate, opt-in;
 # see docs/experiments/REFERENCE_DISTINCTNESS.md) with purity diagnostics
 python3 run.py --controller hybrid --world 48 --radius 0.34 \
   --grouped-sampling --gate auto --nav2-path-validity \
@@ -228,8 +228,8 @@ Only the variants relevant to the thesis direction are exposed:
 | controller | purpose |
 |---|---|
 | `vanilla` | standard MPPI baseline |
-| `local` | local geodesic-body guidance, optionally with pseudopod proposals |
-| `hybrid` | global-path tracking plus gated local pseudopod assistance |
+| `local` | local geodesic-body guidance, optionally with topological-branch proposals |
+| `hybrid` | global-path tracking plus gated local topological-branch assistance |
 
 The earlier `ray`, full-map `flow`, and waypoint `commit` experiments were
 removed from the runnable API. Their useful lessons are incorporated into the
@@ -288,7 +288,7 @@ occupancy / obstacles
 local geodesic body + navigation field        global A* path
         |                                          |
         v                                          |
-pseudopod extraction (V1)                          |
+branch extraction (V1)                             |
         |                                          |
         v                                          v
 branch control means (V2) ----------------> fallback mean
@@ -407,10 +407,10 @@ ancillary_collision_stride: 1
 ```
 
 With the default batch size of 2000, up to 400 rows are recentered around
-distinct pseudopod-derived `(v, omega)` sequences. Promise softmax weights
+distinct branch-derived `(v, omega)` sequences. Promise softmax weights
 divide those rows among the available modes; the remaining roughly 1600 rows
 retain ordinary MPPI sampling. Near the goal, or when no valid distinct
-membrane exit exists, the controller falls back to ordinary MPPI.
+flood-boundary exit exists, the controller falls back to ordinary MPPI.
 Before allocation, every ancillary mean is now rolled through the differential-
 drive model and the live Nav2 robot footprint is checked at every horizon pose.
 Unsafe, unknown, or off-map modes receive no samples. Their allocation is
@@ -419,14 +419,15 @@ vanilla MPPI.
 
 ### Nav2 visualization
 
-- `/amoeba_debug` (`visualization_msgs/MarkerArray`) shows the geodesic body,
-  membrane, optional flow arrows, pseudopods, and state text.
+- `/amoeba_debug` (`visualization_msgs/MarkerArray`) shows the geodesic flood
+  body, its boundary (the membrane), optional flow arrows, topological branches
+  (pseudopods), and state text.
 - `/amoeba/ancillary_path_1` through `_3` (`nav_msgs/Path`) show the selected
-  pseudopod reference centrelines. Add them as RViz **Path** displays, not
+  branch reference centrelines. Add them as RViz **Path** displays, not
   Marker displays.
 - `/amoeba/ancillary_rollout_1` through `_3` (`nav_msgs/Path`) show only the
   dynamically rolled-out means that passed Phase 4 footprint validation.
-- The `/amoeba_debug` text reports pseudopod count, safe-mode count, and the
+- The `/amoeba_debug` text reports branch (pseudopod) count, safe-mode count, and the
   number of samples assigned to validated ancillary modes.
 - `/trajectories` (`visualization_msgs/MarkerArray`) uses one batched
   `LINE_LIST` marker at 5 Hz instead of thousands of per-point markers.
@@ -453,7 +454,7 @@ asynchronously at roughly 2–5 Hz while the controller consumes the latest
 valid proposal set at roughly 15–20 Hz; the asynchronous handoff is not yet
 implemented.
 
-The global planner remains authoritative during normal progress. Pseudopods are
+The global planner remains authoritative during normal progress. Topological branches (pseudopods) are
 local recovery/guidance proposals for blockage, confinement, or local minima,
 not a replacement global planner.
 
@@ -467,6 +468,6 @@ detailed design and experiment notes.
 
 For a thesis-style explanation of the complete V0--V6 development, see
 [docs/amoeba_mppi_progress.tex](docs/amoeba_mppi_progress.tex).
-For a focused derivation of the geodesic body, membrane boundary costs,
-pseudopods, and their connection to Biased MPPI, see
+For a focused derivation of the geodesic flood body, flood-boundary costs,
+topological branches, and their connection to Biased MPPI, see
 [docs/amoeba_mathematics_guide.tex](docs/amoeba_mathematics_guide.tex).

@@ -821,3 +821,44 @@ so a static identity `map->odom` in place of AMCL is the clean localization
 A/B and the condition that matches the planned Vicon-based real robot. The
 15:35 Gazebo run today was made while the installed launch still loaded the
 x1.2 world against the 1:1 map; only runs from 15:38 on are valid.
+
+## RViz shows every TG-MPPI output; rename is presentation-only (2026-09-09)
+
+`susag_nav2/rviz/susag_nav.rviz` (symlink-installed, live) previously had
+none of the plugin's outputs -- its "Trajectories" display even pointed at
+`/marker`, a topic this plugin never publishes. It now has a "TG-MPPI"
+group with everything `optimizer.cpp` / `trajectory_visualizer.cpp`
+publish: the `/amoeba_debug` MarkerArray with all eight namespaces
+enabled (`amoeba_body`, `amoeba_membrane`, `amoeba_membrane_halo`,
+`amoeba_pseudopods`, `flow_dirs`, `amoeba_scan`, `amoeba_mode`,
+`amoeba_state`), the three branch reference Paths
+(`/amoeba/ancillary_path_1..3`) and three validated-rollout Paths
+(`/amoeba/ancillary_rollout_1..3`) in the sandbox's branch colours
+(`visualization.BRANCH_COLORS`), the tracked global plan
+(`/transformed_global_plan`) in the sandbox's A*-path violet, and the
+sample cloud retargeted to `/trajectories`. The stale turtlebot camera
+displays now point at the sim camera's real topics (`/image_raw`,
+`/susag/depth/depth_camera/points`); "Bumper Hit"
+(`/mobile_base/sensors/bumper_pointcloud`) is left as harmless clutter.
+
+Decision (user): the Amoeba -> TG-MPPI rename is **presentation-only**
+for now -- RViz display/group names, README and docs prose (done today
+for the README's Nav2 section: flood body / flood boundary / topological
+branches, with the old term in parentheses where a topic or namespace
+still carries it). ROS topics, parameters, marker namespaces, the
+`nav2_amoeba_mppi_controller` package and `AmoebaController` class, and
+all sandbox identifiers stay as they are until after the Gazebo campaign
+and the freeze (plugin: 57 files / 768 occurrences, not under git, C++
+rebuild required; sandbox: 342 occurrences plus the repository name).
+
+Why the RViz membrane looks octagonal while the sandbox's looks smooth:
+both compute the same thing. `env.py::_geodesic_ball` and
+`flow_field.cpp` both run an 8-connected Dijkstra with `res` /
+`res*sqrt(2)` edge costs, whose ball in open space is an octagon (the
+chamfer metric). The sandbox's `visualization._draw_field` Gaussian-blurs
+the body mask (`sigma=1.2`) before contouring at 0.5 -- its own comment
+calls this "purely cosmetic, doesn't touch the underlying body/flood" --
+while the C++ side draws the raw membrane cells as a `SPHERE_LIST`. The
+RViz picture is the honest geometry. Options, none taken: replicate the
+blur + marching-squares outline in C++ (cosmetic, post-freeze), or a
+16-neighbourhood flood (changes distances, would need re-validation).
