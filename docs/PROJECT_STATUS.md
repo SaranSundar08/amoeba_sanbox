@@ -862,3 +862,38 @@ while the C++ side draws the raw membrane cells as a `SPHERE_LIST`. The
 RViz picture is the honest geometry. Options, none taken: replicate the
 blur + marching-squares outline in C++ (cosmetic, post-freeze), or a
 16-neighbourhood flood (changes distances, would need re-validation).
+
+**Correction, same day: the `/amoeba_debug` display stalls the controller
+while enabled.** Reported as "robot gets stuck when the TG sampling view
+is on, moves smoothly when it's off". Cause, from `optimizer.cpp`:
+`amoeba_debug: true` makes `publishFlowDebug()` run every control cycle
+(call sites in the per-cycle NORMAL/ASSIST paths, not only on reflood);
+its only cost gate is `get_subscription_count() == 0`. With no RViz
+subscriber it returns immediately. With one, every 50 ms cycle it walks
+the whole flow-field grid, pushes ~31,000 SPHERE_LIST points for the body
+(one per 0.025 m cell of a 2.5 m disc), copies the membrane again for the
+halo, and serializes/publishes ~0.75 MB inside the control loop at 20 Hz,
+while RViz rebuilds 31k sphere instances at 20 Hz on the same machine.
+The config had no `/amoeba_debug` display before 2026-09-09, so the gate
+had always kept this free; adding the display enabled exposed it. The
+`/trajectories` sample cloud is not the cause (~4k line points, and it is
+built regardless of subscribers). Fix applied: the display now defaults
+to off and is labelled as heavy; toggle it on for screenshots. Proper fix
+(C++, post-campaign): publish the flood markers only on reflood cycles,
+decimate the body (stride 2-3) or use POINTS instead of SPHERE_LIST, drop
+the halo copy, and ideally build markers off the control thread.
+
+Also, for the RViz "No map received" warning on the local costmap:
+`always_send_full_costmap: true` added to the local costmap in all four
+campaign yamls (it was set only on the global one). A rolling costmap
+otherwise publishes only updates once its origin stops moving, and a
+display that subscribes mid-run can be left waiting for a full grid.
+Publishing-only; 200x200 cells at 2 Hz. If the warning persists, check
+publisher QoS against the display (`ros2 topic info -v
+/local_costmap/costmap`: a Volatile publisher is incompatible with the
+display's Transient Local request) and whether the topic is publishing at
+all (`ros2 topic hz`). Unverified and worth checking with `ros2 topic
+list | grep points`: the depth-camera topic the `stvl_local` layer and
+the RViz depth display use (`/susag/depth/depth_camera/points`) may
+actually be `/susag/depth_camera/points` given the plugin's namespace and
+remap; if so both need the corrected name.
