@@ -897,3 +897,26 @@ list | grep points`: the depth-camera topic the `stvl_local` layer and
 the RViz depth display use (`/susag/depth/depth_camera/points`) may
 actually be `/susag/depth_camera/points` given the plugin's namespace and
 remap; if so both need the corrected name.
+
+**Confirmed, same day: the depth camera topics were never right.**
+gazebo_ros_camera remap keys must be prefixed with the camera name (the
+shipped `gazebo_ros_depth_camera_demo.world` says so explicitly); the
+`.gazebo` file's `~/image`, `~/depth_image`, `~/points` keys matched
+nothing, so all four remaps were silently ignored and the plugin has
+always published at its defaults under the `susag` namespace:
+`/susag/depth_camera/image_raw`, `/susag/depth_camera/depth/image_raw`,
+`/susag/depth_camera/points` (+ camera_info topics). Every consumer
+pointed elsewhere: the yamls' `stvl_local` and global `pointcloud` layers
+at `/susag/depth/depth_camera/points` (an extra `depth/`), so the
+spatio-temporal voxel layers have never received a cloud and the
+1280x720 @ 30 Hz camera has been pure simulation load; and RViz's camera
+displays at old turtlebot names, then (my retarget) at the yaml's wrong
+name -- which is why no camera image was ever visible. Fixed: the dead
+remaps replaced by a comment stating the real topics (no functional
+change), all four yamls' pointcloud sources and the RViz image/cloud
+displays on the real names, a depth-image display added, and the RViz
+camera displays set to Best Effort so they match the plugin regardless of
+which QoS it publishes with. Not changed: whether to keep the STVL layers
+at all for BARN (2-D pillars, nothing above lidar height) or drop the
+camera resolution/rate -- a campaign-condition decision; note that from
+now on the voxel layers will actually mark, which they never did before.
