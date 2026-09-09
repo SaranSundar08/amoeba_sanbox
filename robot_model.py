@@ -15,8 +15,13 @@ class RobotModel:
 
     kind: str = "ideal"
     radius: float = 0.30
-    footprint_length: float = 0.90
-    footprint_width: float = 0.65
+    # Matches the Nav2 costmap footprint in susag_nav2/param/navigation_
+    # amoeba*.yaml ([[0.42, 0.34], ...] = 0.84 x 0.68 m), so the sandbox
+    # and the Gazebo/Nav2 port check collisions against the same rectangle.
+    # Banked SLIP results before 2026-09-09 were produced at the earlier
+    # provisional 0.90 x 0.65 m (see docs/PROJECT_STATUS.md, that date).
+    footprint_length: float = 0.84
+    footprint_width: float = 0.68
     yaw_gain: float = 0.82
     speed_yaw_loss: float = 0.55
     turn_margin: float = 0.08
@@ -116,8 +121,8 @@ class RobotModel:
         approximation is a deliberate, cheaper trade for a soft cost signal.
 
         `clearance()`'s SLIP path samples a fixed 17 points on the oriented
-        footprint boundary. On the 0.90 m long edges those samples are
-        0.225 m apart, so a BARN cylinder (radius 0.075 m) can sit up to
+        footprint boundary. On the 0.84 m long edges those samples are
+        0.21 m apart, so a BARN cylinder (radius 0.075 m) can sit up to
         about 0.06 m inside the true rectangle, exactly between two
         samples, and still read as clear. This instead computes the exact
         analytic point-to-oriented-rectangle distance against every real

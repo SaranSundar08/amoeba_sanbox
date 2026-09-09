@@ -134,9 +134,9 @@ def main():
     p.add_argument("--robot-model", choices=("ideal", "slip"),
                    default="ideal",
                    help="V6: shared prediction/simulation model")
-    p.add_argument("--footprint-length", type=float, default=0.90,
+    p.add_argument("--footprint-length", type=float, default=0.84,
                    help="V6 slip footprint length in metres")
-    p.add_argument("--footprint-width", type=float, default=0.65,
+    p.add_argument("--footprint-width", type=float, default=0.68,
                    help="V6 slip footprint width in metres")
     p.add_argument("--skid-yaw-gain", type=float, default=0.82,
                    help="V6 zero-speed achieved/commanded yaw-rate ratio")

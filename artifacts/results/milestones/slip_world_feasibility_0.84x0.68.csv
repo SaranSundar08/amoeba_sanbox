@@ -1,0 +1,301 @@
+world,category,astar_reachable,path_length_m,centreline_margin_m,footprint_clearance_m,bottleneck_x,bottleneck_y,reason
+0,tight,1,9.372,0.008,0.055,-3.034,5.777,
+1,tight,1,9.572,0.001,0.081,-2.507,8.295,
+2,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+3,tight,1,9.010,0.001,0.081,-2.362,6.849,
+4,tight,1,9.630,0.000,0.080,-2.747,6.963,
+5,tight,1,9.000,0.031,0.110,-2.250,6.100,
+6,critical,1,9.401,0.006,0.025,-2.838,8.594,
+7,footprint_collision,1,9.728,-0.014,-0.028,-2.273,10.016,
+8,tight,1,9.563,0.013,0.093,-3.129,8.840,
+9,tight,1,9.005,0.000,0.080,-2.364,5.098,
+10,tight,1,9.142,0.002,0.082,-2.659,8.088,
+11,tight,1,9.048,0.004,0.084,-2.673,6.634,
+12,tight,1,9.506,0.018,0.073,-1.795,7.256,
+13,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+14,tight,1,9.427,0.008,0.089,-2.960,9.360,
+15,tight,1,9.180,0.005,0.064,-2.247,8.018,
+16,tight,1,9.510,0.010,0.081,-3.389,7.370,
+17,tight,1,9.424,0.009,0.089,-1.414,5.930,
+18,tight,1,9.163,0.021,0.101,-2.822,7.776,
+19,critical,1,10.490,0.003,0.031,-2.382,8.653,
+20,tight,1,9.044,0.001,0.081,-1.831,6.033,
+21,tight,1,9.193,0.011,0.091,-2.827,5.261,
+22,footprint_collision,1,9.407,-0.014,-0.029,-2.250,10.000,
+23,critical,1,9.089,0.001,0.040,-2.024,7.458,
+24,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+25,tight,1,9.069,0.036,0.116,-1.954,7.944,
+26,footprint_collision,1,9.275,-0.000,-0.059,-2.258,6.926,
+27,tight,1,9.083,0.010,0.090,-2.521,7.494,
+28,tight,1,9.103,0.011,0.091,-1.831,8.538,
+29,tight,1,9.267,0.025,0.105,-3.112,7.443,
+30,tight,1,9.971,0.020,0.100,-1.194,7.528,
+31,tight,1,9.320,0.020,0.051,-1.760,8.171,
+32,tight,1,9.005,0.000,0.080,-2.364,4.948,
+33,tight,1,10.297,0.003,0.062,-1.663,6.641,
+34,tight,1,9.044,0.004,0.084,-2.672,5.128,
+35,tight,1,9.494,0.000,0.080,-3.042,9.244,
+36,tight,1,9.000,0.031,0.110,-2.250,8.050,
+37,tight,1,9.557,0.017,0.076,-3.267,8.257,
+38,footprint_collision,1,10.092,-0.014,-0.002,-2.294,10.029,
+39,critical,1,9.037,0.002,0.038,-2.269,8.394,
+40,comfortable,1,9.000,0.180,0.260,-2.250,9.100,
+41,tight,1,9.000,0.031,0.110,-2.250,7.150,
+42,comfortable,1,9.000,0.480,0.560,-2.250,8.500,
+43,tight,1,9.437,0.011,0.062,-1.504,6.296,
+44,tight,1,9.963,0.007,0.059,-3.162,8.327,
+45,tight,1,9.686,0.004,0.084,-3.082,6.082,
+46,tight,1,9.123,0.013,0.093,-1.523,5.846,
+47,tight,1,9.155,0.003,0.083,-2.804,7.476,
+48,tight,1,9.187,0.001,0.073,-3.136,5.693,
+49,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+50,tight,1,9.310,0.003,0.082,-1.260,6.966,
+51,tight,1,9.092,0.001,0.081,-1.682,5.716,
+52,tight,1,9.264,0.008,0.088,-1.676,5.413,
+53,tight,1,9.505,0.001,0.081,-1.537,9.466,
+54,tight,1,9.033,0.002,0.082,-2.511,5.993,
+55,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+56,tight,1,9.156,0.003,0.083,-1.681,5.111,
+57,tight,1,9.556,0.013,0.093,-1.072,8.255,
+58,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+59,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+60,tight,1,9.326,0.003,0.083,-1.093,5.349,
+61,comfortable,1,9.000,0.180,0.260,-2.250,6.700,
+62,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+63,tight,1,9.102,0.008,0.088,-1.676,5.413,
+64,critical,1,10.093,0.007,0.020,-0.683,9.071,
+65,tight,1,9.135,0.012,0.092,-2.670,8.839,
+66,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+67,comfortable,1,9.000,0.180,0.260,-2.250,7.600,
+68,tight,1,9.056,0.001,0.081,-2.669,5.280,
+69,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+70,tight,1,9.367,0.008,0.089,-2.811,8.756,
+71,tight,1,9.005,0.000,0.080,-2.136,4.948,
+72,tight,1,9.000,0.031,0.110,-2.250,7.600,
+73,tight,1,9.131,0.003,0.083,-2.808,6.346,
+74,tight,1,9.091,0.004,0.084,-2.821,5.564,
+75,comfortable,1,9.000,0.180,0.260,-2.250,6.100,
+76,tight,1,9.626,0.010,0.079,-3.094,7.853,
+77,tight,1,9.263,0.020,0.100,-1.806,9.585,
+78,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+79,tight,1,9.273,-0.014,0.060,-2.294,10.000,
+80,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+81,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+82,tight,1,9.668,0.020,0.101,-3.280,7.619,
+83,tight,1,9.403,0.014,0.093,-1.935,7.211,
+84,tight,1,9.030,0.003,0.083,-2.522,5.892,
+85,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+86,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+87,tight,1,9.049,0.004,0.084,-2.673,6.634,
+88,footprint_collision,1,9.456,-0.014,-0.024,-2.287,10.025,
+89,tight,1,9.296,0.016,0.066,-1.816,6.055,
+90,tight,1,9.106,0.004,0.084,-2.821,6.621,
+91,tight,1,10.112,0.006,0.086,-2.969,5.543,
+92,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+93,comfortable,1,9.000,0.630,0.710,-2.250,4.750,
+94,comfortable,1,9.000,0.180,0.260,-2.250,7.600,
+95,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+96,critical,1,9.583,0.001,0.028,-2.045,5.831,
+97,tight,1,9.140,0.007,0.087,-1.539,7.249,
+98,tight,1,9.106,0.005,0.061,-2.532,7.855,
+99,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+100,tight,1,9.321,0.011,0.091,-3.273,7.663,
+101,tight,1,9.082,0.002,0.081,-1.954,8.826,
+102,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+103,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+104,tight,1,10.366,0.008,0.088,-1.676,5.413,
+105,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+106,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+107,tight,1,9.715,0.001,0.081,-1.831,5.280,
+108,tight,1,9.148,0.024,0.104,-1.676,7.625,
+109,tight,1,9.121,0.004,0.084,-2.672,5.128,
+110,tight,1,9.335,0.008,0.088,-3.058,6.187,
+111,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+112,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+113,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+114,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+115,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+116,tight,1,9.143,0.004,0.059,-1.904,8.889,
+117,footprint_collision,1,10.219,0.001,-0.039,-0.900,6.424,
+118,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+119,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+120,tight,1,9.622,0.001,0.052,-3.557,5.358,
+121,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+122,tight,1,9.252,0.003,0.083,-1.829,5.581,
+123,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+124,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+125,footprint_collision,1,9.107,0.001,-0.033,-1.800,7.628,
+126,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+127,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+128,tight,1,9.055,0.001,0.081,-1.989,6.894,
+129,tight,1,9.318,0.001,0.081,-3.166,5.099,
+130,critical,1,9.087,0.008,0.028,-1.939,6.481,
+131,tight,1,9.508,-0.000,0.058,-2.394,8.592,
+132,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+133,tight,1,9.226,0.009,0.089,-1.760,7.231,
+134,tight,1,9.497,0.007,0.053,-2.681,6.058,
+135,tight,1,9.124,0.007,0.087,-1.558,5.800,
+136,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+137,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+138,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+139,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+140,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+141,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+142,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+143,critical,1,9.591,0.001,0.004,-1.545,8.137,
+144,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+145,tight,1,9.141,0.005,0.062,-2.452,7.994,
+146,tight,1,9.364,0.013,0.093,-1.076,6.731,
+147,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+148,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+149,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+150,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+151,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+152,tight,1,9.389,0.006,0.086,-3.418,6.885,
+153,tight,1,9.667,0.000,0.053,-3.324,8.280,
+154,tight,1,9.146,0.002,0.059,-2.115,9.455,
+155,critical,1,9.408,0.000,0.020,-1.560,9.448,
+156,tight,1,9.172,0.004,0.083,-1.551,7.613,
+157,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+158,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+159,tight,1,9.044,0.001,0.081,-1.989,6.594,
+160,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+161,tight,1,9.097,0.003,0.083,-1.681,6.169,
+162,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+163,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+164,tight,1,9.099,0.001,0.070,-1.837,5.724,
+165,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+166,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+167,critical,1,9.910,0.003,0.037,-0.637,5.307,
+168,critical,1,10.128,0.002,0.041,-3.185,7.950,
+169,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+170,critical,1,9.251,0.002,0.021,-2.662,8.746,
+171,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+172,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+173,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+174,critical,1,9.310,0.002,0.023,-2.762,8.877,
+175,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+176,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+177,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+178,tight,1,9.369,0.010,0.060,-1.367,8.260,
+179,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+180,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+181,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+182,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+183,critical,1,9.297,0.001,0.039,-2.430,8.799,
+184,critical,1,9.548,0.001,0.021,-2.752,8.596,
+185,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+186,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+187,footprint_collision,1,9.816,-0.014,-0.037,-2.276,10.017,
+188,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+189,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+190,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+191,tight,1,9.571,0.011,0.062,-3.740,7.045,
+192,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+193,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+194,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+195,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+196,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+197,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+198,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+199,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+200,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+201,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+202,tight,1,9.053,0.004,0.065,-1.838,6.327,
+203,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+204,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+205,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+206,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+207,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+208,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+209,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+210,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+211,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+212,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+213,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+214,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+215,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+216,tight,1,9.559,0.008,0.064,-2.718,8.381,
+217,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+218,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+219,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+220,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+221,tight,1,9.602,0.000,0.081,-1.338,9.383,
+222,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+223,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+224,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+225,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+226,critical,1,9.598,-0.014,0.022,-2.260,10.007,
+227,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+228,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+229,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+230,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+231,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+232,tight,1,10.803,0.001,0.081,-1.190,6.538,
+233,tight,1,9.083,0.006,0.086,-1.826,6.935,
+234,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+235,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+236,critical,1,9.263,0.002,0.040,-1.216,5.431,
+237,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+238,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+239,tight,1,9.519,0.004,0.084,-2.944,6.459,
+240,tight,1,9.533,0.017,0.097,-1.836,9.376,
+241,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+242,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+243,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+244,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+245,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+246,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+247,tight,1,9.151,0.001,0.080,-2.881,7.240,
+248,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+249,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+250,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+251,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+252,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+253,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+254,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+255,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+256,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+257,critical,1,9.246,0.000,0.009,-2.565,6.482,
+258,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+259,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+260,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+261,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+262,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+263,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+264,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+265,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+266,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+267,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+268,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+269,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+270,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+271,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+272,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+273,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+274,tight,1,10.059,-0.000,0.080,-1.832,6.484,
+275,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+276,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+277,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+278,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+279,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+280,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+281,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+282,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+283,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+284,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+285,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+286,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+287,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+288,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+289,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+290,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+291,tight,1,9.191,0.011,0.091,-1.417,5.473,
+292,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+293,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+294,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+295,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+296,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+297,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+298,unreachable,0,,,,,,A*: goal unreachable in inflated free space
+299,unreachable,0,,,,,,A*: goal unreachable in inflated free space

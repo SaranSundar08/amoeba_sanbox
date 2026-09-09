@@ -701,3 +701,69 @@ baseline at N=18. Both are legitimate future-work items with first-pass
 evidence attached, not results to cite as validated. Both mechanisms
 remain off by default; no existing benchmark or generality-matrix result
 is affected.
+
+## Footprint match and 1:1 Gazebo worlds (2026-09-09)
+
+Two consistency fixes ahead of the Gazebo/Nav2 trials, made so sandbox and
+Gazebo outcomes are comparable rather than merely similar.
+
+**Footprint.** The sandbox's SLIP rectangle was the provisional
+`0.90 x 0.65 m`; the Nav2 costmap footprint the port actually collides
+against is `[[0.42, 0.34], ...]` = `0.84 x 0.68 m`
+(`susag_nav2/param/navigation_amoeba*.yaml`). The sandbox now defaults to
+`0.84 x 0.68` everywhere the old value lived: `RobotModel` (`robot_model.
+py`), `MPPI.__init__` (`mppi.py` -- the site the frozen benchmarks actually
+used), `cli.py` flags, `experiments/v6_ablation.py` CONFIGS, and the torch
+port (`torch_port/model.py`, `torch_port/scan_slip_worlds.py` -- inside the
+`torch_port` git submodule, left uncommitted alongside its other
+pre-existing uncommitted work). Planning radius becomes `0.34 + 0.08 = 0.42
+m`, identical to the Gazebo tiering's half-width. Every test passes
+explicit dimensions, so 114/114 still pass; the torch-port suite is
+unchanged (28 run, 20 skipped, 3 errors that are `import torch` failing at
+module load -- PyTorch is not in system Python -- pre-existing).
+
+**Banked results are records, not re-run.** All SLIP CSVs dated before
+2026-09-09 (`v6_ablation*`, `v6_ablation_plant_mismatch*`, the generality/
+blocked-split matrices where `robot_model=slip`) were produced at `0.90 x
+0.65`; to reproduce them pass `--footprint-length 0.90 --footprint-width
+0.65` (or set `v6_ablation.py`'s CONFIGS back). Their numbers and the
+conclusions drawn from them are unchanged; only the default for *future*
+runs moved. The feasibility screen was re-run at the new footprint into a
+separate file (`slip_world_feasibility_0.84x0.68.csv`, see
+`docs/experiments/SLIP_WORLD_FEASIBILITY.md`): nine of the ten frozen
+development worlds stay suitable, 0 and 48 improve, and **world 7 flips to
+footprint collision (-0.028 m on its A* route)**. Treat world 7 as
+feasibility-excluded at 1:1 under the measured footprint in Gazebo and
+report it separately; the banked world-7 result stands as recorded.
+
+**Gazebo now runs the 1:1 dataset.** `susag_new_model/launch/gazebo_barn.
+launch.py` and `susag_nav2/launch/navigation.launch.py` had `BARN_SCALE =
+1.2` hardcoded; both are now `1.0`. At x1.2 all 300 BARN worlds are
+"comfortable" for this footprint (`BARN_dataset/scaled_1.2/
+susag_suitable_worlds.txt`: SAFE 300, TIGHT 0) and the narrow-environment
+claim is untestable there -- and on comfortable worlds the branch
+mechanism is never selected (0% in the static matrix). At 1:1: SAFE 114,
+TIGHT 186. `BARN_dataset/scaled_1` (the 1:1 output of `scale_barn.py`) was
+regenerated with the current script so it carries the sealed lateral-wall
+cylinders (`0.080 m`, no lidar leakage through seams) that `scaled_1.2`
+already had but the July `scaled_1` did not; obstacle poses verified
+numerically identical to the raw dataset (max |diff| 0.0 on worlds 7/48/
+93), maps carry the 12 planner-padding rows. `benchmark_barn.py`'s `geo()`
+now uses `scaled_<s>` for every scale including 1.0 instead of the raw,
+unsealed, unpadded root set.
+
+**Gazebo comparison arms had different footprints.** `benchmark_barn.py`
+runs `vanilla`/`biased`/`log`/`lowpass` on `navigation_sim.yaml` (was
+`0.82 x 0.66`) and `amoeba` on `navigation_amoeba.yaml` (`0.84 x 0.68`).
+Both `navigation_sim.yaml` and `navigation_sim_tight.yaml` are now `0.84 x
+0.68` so all arms collide against the same rectangle. `navigation.yaml`
+(`0.80 x 0.64`, padding `0.08`; presumably the physical-robot profile) was
+deliberately not touched -- reconcile it against the measured chassis
+before real-robot runs. The 14 existing rows in `susag_nav2/benchmark/
+barn_results.csv` are worlds-42/93 smoke runs made with the raw dataset
+and the old vanilla footprint; archive that file before new trials so
+rows are not silently mixed (the CSV has no footprint column).
+
+None of the ROS-side files are under version control; the pre-edit
+versions of all five (and the July `scaled_1`) are in this session's
+scratchpad `ros_backup_2026-09-09/`.

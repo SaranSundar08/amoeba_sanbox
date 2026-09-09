@@ -136,7 +136,7 @@ python3 run.py --controller hybrid --world 48 --radius 0.34 \
 python3 run.py --controller hybrid --world 48 --radius 0.34 \
   --grouped-sampling --gate auto --nav2-path-validity \
   --replan-every 1.0 --robot-model slip \
-  --footprint-length 0.90 --footprint-width 0.65 \
+  --footprint-length 0.84 --footprint-width 0.68 \
   --skid-yaw-gain 0.82 --skid-speed-yaw-loss 0.55 \
   --turn-safety-margin 0.08 --speed-safety-margin 0.03 --animate
 
@@ -375,8 +375,14 @@ The tight simulation profile is:
 ~/robohouse_ws/src/susag_nav2/param/navigation_amoeba_tight.yaml
 ```
 
-The current profile uses the scaled x1.2 BARN dataset by default. Start a
-matching Gazebo world and Nav2 map using only the world index:
+The current profile uses the **1:1** BARN dataset by default
+(`BARN_dataset/scaled_1`: unscaled obstacle spacing, sealed lateral-wall
+cylinders, planner-padded maps) -- the same scale as every sandbox result,
+so Gazebo outcomes are directly comparable. At x1.2 all 300 BARN worlds
+become "comfortable" for this footprint and the narrow-environment claim is
+untestable; scaled copies remain available via `worlds_dir:=`/`map:=` as an
+explicitly easier tier only. Start a matching Gazebo world and Nav2 map
+using only the world index:
 
 ```bash
 source ~/robohouse_ws/install/setup.zsh

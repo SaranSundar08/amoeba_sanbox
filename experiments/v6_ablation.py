@@ -18,8 +18,12 @@ CONFIGS = {
     "ideal": {"robot_model": "ideal"},
     "slip": {
         "robot_model": "slip",
-        "footprint_length": 0.90,
-        "footprint_width": 0.65,
+        # 0.84 x 0.68 m = the Nav2 costmap footprint (2026-09-09). The banked
+        # v6_ablation*.csv / v6_ablation_plant_mismatch*.csv were produced at
+        # the earlier provisional 0.90 x 0.65 m; set these back to reproduce
+        # them exactly.
+        "footprint_length": 0.84,
+        "footprint_width": 0.68,
         "skid_yaw_gain": 0.82,
         "skid_speed_yaw_loss": 0.55,
         "turn_safety_margin": 0.08,
