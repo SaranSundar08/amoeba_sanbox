@@ -920,3 +920,88 @@ which QoS it publishes with. Not changed: whether to keep the STVL layers
 at all for BARN (2-D pillars, nothing above lidar height) or drop the
 camera resolution/rate -- a campaign-condition decision; note that from
 now on the voxel layers will actually mark, which they never did before.
+
+**rviz2 crashes when a camera display is enabled (2026-09-09).** The
+kernel log shows five rviz2 segfaults today. Four -- at 15:37, 15:42,
+16:14 and 16:26, including the two launch *shutdowns* when no camera
+display was being touched -- fault at the identical instruction in
+`librclcpp.so` (`ip ...e3b31`, `error 4`); the fifth (16:43) in `libc`.
+The session is x11 on an NVIDIA RTX 4060 (driver 580), so this is not
+the Wayland/GPU class of rviz2 crash. It is the ROS-client-library
+subscription-teardown class: toggling a display creates or destroys a
+subscription, and on a 30 Hz, multi-MB topic (the camera image/cloud
+that only began publishing to a subscribed topic after today's topic
+fix) the race is hit deterministically. Installed: rviz2 11.2.28,
+rclcpp 16.0.19, rmw_fastrtps_cpp 6.2.10 (the default RMW), and
+rmw_cyclonedds_cpp 1.3.4 is present. Known related reports:
+[ros2/rviz#703](https://github.com/ros2/rviz/issues/703) (rviz2 randomly
+crashes with the Nav2 stack), [ros2/rclcpp#2437](https://github.com/ros2/
+rclcpp/issues/2437) (segfault in `RMWSubscriptionEvent::
+update_data_available()` with Fast DDS), and
+[ros2/rviz#574](https://github.com/ros2/rviz/issues/574) (the costmap
+footprint Polygon display crashes rviz2; this config has the local one
+enabled). Mitigations: the three camera displays now default to off (a
+first version of that edit put an unquoted `: ` in the display names and
+broke the YAML -- fixed); view images with `ros2 run rqt_image_view
+rqt_image_view /susag/depth_camera/image_raw` (installed, separate
+process); and, per Nav2's own Humble guidance, run the whole stack on
+CycloneDDS (`export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp` before every
+launch, all terminals and the benchmark alike -- all nodes must share
+the RMW). Not applied: switching RMW is a campaign-wide condition the
+user should set deliberately; if crashes persist under CycloneDDS,
+disable the local-costmap Polygon display next (#574).
+
+## Stock nav2_mppi_controller as the "normal MPPI" comparator (2026-09-09)
+
+`~/robohouse_ws/src/nav2_mppi_controller` is a local checkout/build of the
+Nav2 MPPI controller (built at `install/nav2_mppi_controller/lib/
+libmppi_controller.so`, not the apt package), forked to add an
+`mppi_variant` param (`vanilla | log | lowpass | biased`) selecting
+between plain i.i.d. Gaussian sampling and three research variants --
+`noise_generator.cpp` labels `vanilla`'s branch "i.i.d. zero-mean Gaussian
+perturbations", i.e. genuinely the standard MPPI, not a relabeled custom
+behavior. `navigation_sim.yaml`/`navigation_sim_tight.yaml` run `FollowPath`
+as this controller with `mppi_variant: "vanilla"`; `navigation_amoeba*.
+yaml` run it as `nav2_amoeba_mppi_controller::AmoebaController`. These are
+the intended vanilla-vs-TG-MPPI comparator pair, already used that way by
+`benchmark_barn.py`'s `CONTROLLERS` dict.
+
+They were not actually parameter-matched. A structural (YAML-parsed, not
+grep) diff of `navigation_amoeba_tight.yaml` vs `navigation_sim_tight.yaml`
+-- the pair `navigation.launch.py` actually launches by default -- found,
+beyond the deliberate `plugin` and `FlowFieldCritic`-in-`critics` (the
+"additional parts from the controller we created") differences:
+`vx_max` 0.35 vs 0.3, `vx_std` 0.3 vs 0.2, `wz_std` 0.7 vs 0.3,
+`PathAlignCritic.cost_weight` 6.0 vs 3.0, `PathAngleCritic.cost_weight`
+5.0 vs 2.0, `PreferForwardCritic.cost_weight` 1.0 vs 2.0. `vx_max`/`vx_std`/
+`wz_std` in particular would have let vanilla explore a different speed
+envelope than TG-MPPI, confounding any comparison. (A naive flat-key grep
+across the whole `FollowPath` block is unsafe here -- `cost_weight` and
+`consider_footprint` each appear under several differently-named critics,
+so a bare-key diff can compare two unrelated critics' values; the fix used
+PyYAML and diffed per named critic block.) All six values in
+`navigation_sim_tight.yaml` set to match `navigation_amoeba_tight.yaml`;
+re-diffed after, zero remaining differences besides `plugin` and the
+critics list. Local costmap resolution/size/rates and the progress/goal
+checkers were already identical between the two files.
+
+`navigation_amoeba.yaml` vs `navigation_sim.yaml` (the non-tight pair,
+used by `benchmark_barn.py` directly rather than the interactive launch)
+has the same class of drift -- `vx_max` 0.5 vs 1.0, `wz_std` 0.4 vs 0.6 --
+**not yet fixed**; do the same structural-diff-and-match pass before
+running `benchmark_barn.py`'s `vanilla` arm for a real result.
+
+To view the stock controller live: same launch, override the params file
+(the vanilla controller still needs the front/rear-lidar-fed local
+costmap and the matched footprint, both already in this file):
+
+```bash
+ros2 launch susag_nav2 navigation.launch.py sim:=true world_idx:=48 \
+  nav2_params:=/home/saran/robohouse_ws/src/susag_nav2/param/navigation_sim_tight.yaml
+```
+
+The RViz TG-MPPI group's `/amoeba_debug`, `/amoeba/ancillary_*` displays
+will show nothing under this controller (it never publishes them) --
+expected, not a fault; `/trajectories` (the sample cloud) and
+`/transformed_global_plan` are published by both controllers and remain
+meaningful for either.
