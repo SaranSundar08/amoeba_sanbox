@@ -767,3 +767,57 @@ rows are not silently mixed (the CSV has no footprint column).
 None of the ROS-side files are under version control; the pre-edit
 versions of all five (and the July `scaled_1`) are in this session's
 scratchpad `ros_backup_2026-09-09/`.
+
+## Two lidars as two costmap sources; AMCL on the front only (2026-09-09)
+
+Diagnosing "gets stuck a bit in highly narrow worlds" in Gazebo turned up
+a sensor-wiring problem that predates today. The robot carries a front and
+a rear 180-degree lidar. The real robot publishes them as `/front_scan` and
+`/rear_scan` (`ydlidar_ros2_driver/launch/dual_launch.py`). The earlier
+setup fused them with `ros2_laser_scan_merger` into one 360-degree `/scan`
+for AMCL and the costmaps; that produced localization drift, so the merger
+was disabled and the sim's front lidar was remapped straight to `/scan`,
+leaving the rear lidar unused.
+
+The drift was a wiring bug, not the rear lidar: the merger subscribes to
+`/front_scan`, but the sim's front lidar had been remapped to `/scan`, so
+the merger never received the front lidar at all -- it fused the rear 180
+degrees alone into a "360-degree" scan and republished it on `/scan`,
+interleaved with the raw front `/scan` on the same topic. AMCL was fed
+two geometrically different scans in alternation. (Its config also has
+`range_min: 0.35`, which blanks anything nearer than 35 cm.) The costmap
+yamls' second observation source pointed at `/base/scan`, a topic that
+exists on neither the sim nor the real robot -- dead everywhere -- and in
+`navigation_amoeba_tight.yaml` it was not even listed in
+`observation_sources`. With reversing allowed (`vx_min: -0.35`), MPPI could
+back into space the front lidar had never observed.
+
+Nav2's costmap obstacle layer accepts any number of observation sources,
+each transformed through TF individually; only AMCL is limited to a single
+`scan_topic`. So no fusion is needed for either job. Changed, in all four
+sim/campaign yamls (`navigation_amoeba_tight`, `navigation_amoeba`,
+`navigation_sim`, `navigation_sim_tight`) so every comparison arm is
+identical: AMCL `scan_topic: front_scan`; global and local obstacle layers
+`observation_sources: front_scan rear_scan` with topics `/front_scan` and
+`/rear_scan`. The sim's front lidar is back on `/front_scan`
+(`susag_new_model/urdf/susag_updated_model.gazebo`, symlink-installed, live
+at next launch), matching the real robot's topic names so one yaml serves
+both. RViz shows both scans (`susag_nav.rviz`); `benchmark_barn.py` and
+`benchmark_amoeba.py` take their collision proxy from both lidars. Not
+touched, still on `/scan`: `navigation.yaml` (real-robot profile) and
+`test_config.yaml`, and `slam.yaml` (mapping) -- apply the same change to
+the real-robot profile before hardware runs. Pre-edit copies of every file
+are in the session scratchpad `ros_backup_2026-09-09/`.
+
+Separately noted for the Gazebo trials, not changed: the progress checker
+(`required_movement_radius: 0.5` in `movement_time_allowance: 10.0`) fails
+the controller on a slow bottleneck crawl, after which the default BT runs
+`recoveries_server`'s Spin / BackUp / Wait -- a Spin with a 0.84 m robot in
+a ~0.8 m gap is physically impossible; `inflation_radius: 0.45` with
+`cost_scaling_factor: 6.0` puts a 0.399 m half-gap entirely at cost ~200,
+which is what makes the crawl slow; and the Gazebo diff-drive plugin's odom
+is world-referenced (set `<odometry_source>1</odometry_source>` explicitly),
+so a static identity `map->odom` in place of AMCL is the clean localization
+A/B and the condition that matches the planned Vicon-based real robot. The
+15:35 Gazebo run today was made while the installed launch still loaded the
+x1.2 world against the 1:1 map; only runs from 15:38 on are valid.
