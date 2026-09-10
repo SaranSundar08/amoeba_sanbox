@@ -1140,3 +1140,84 @@ discussed and scoped earlier this session but superseded by this cleanup
 request. Still the agreed next step if the user wants to continue down
 that path -- a genuinely separate, multi-day C++/CUDA undertaking, not
 something to start opportunistically at the tail of this session.
+
+## 2026-09-10 (continued): GPU port slice 1 -- NoiseGenerator/rollout, with real numbers
+
+User pushed nav2_tgmppi_controller + susag_nav2/susag_bringup/susag_teleop
+(the whole ~/robohouse_ws/src/ tree) to a new home,
+https://github.com/SaranSundar08/SLIP -- this is now the canonical remote
+for all of Saran's own ROS packages (separate from this amoeba_sandbox
+repo, which stays Python-sandbox + docs only). Then: "let's start" on the
+GPU port, reordering it ahead of homotopy-consistency cost / report per
+an explicit priority decision.
+
+**Toolchain proof (before touching any controller code)**: LibTorch
+2.7.1+cu126 (cxx11-ABI) installed to `~/libtorch_cu126/libtorch`, matching
+this machine's `cuda-toolkit-12.6` (nvcc at `/usr/local/cuda-12.6/bin/nvcc`,
+not on PATH) and driver 580.178.04 (CUDA-13-capable). A tiny standalone
+CMake project confirmed a real CUDA matmul running on `cuda:0`
+(RTX 4060, auto-detected sm_89) before any production code changed.
+
+**Design: additive knob, not a rewrite-in-place.** Added
+`compute_backend: "cpu"|"cuda"` to `OptimizerSettings` (default `"cpu"`,
+always available). The existing xtensor CPU path is completely
+unchanged and untouched by default; a new `GpuRollout` class
+(`tools/gpu_rollout.hpp`/`.cpp`) implements
+`Optimizer::updateStateVelocities()` + `Optimizer::integrateStateVelocities()`
+(the diff-drive predict + cumulative-kinematics integration -- the K x T
+hot loop) in LibTorch, selected at runtime by `compute_backend`. Compiles
+to an empty translation unit unless the package is built with
+`-DTGMPPI_WITH_CUDA=ON` (new CMake option, OFF by default) --
+**no LibTorch dependency exists at all for a normal build.**
+`generateNoisedTrajectories()` branches to the GPU path only when
+`compute_backend=="cuda"` AND a CUDA device was actually found at
+`reset()` time; any mismatch (built without CUDA support, or no GPU at
+runtime) logs a warning and silently falls back to `"cpu"` -- the
+controller can never fail to start over this.
+
+Deliberately NOT moved to GPU in this slice: noise generation (stays
+xtensor/CPU -- cheap, and keeping it CPU-side means the *same* noise
+draw feeds both backends, which is what makes the parity test below
+possible) and the TG-MPPI flow bias (`applyFlowBias()` -- small, serial,
+per-mode logic that reads/writes the same xtensor `state_.cvx/cwz`
+critics still consume; nothing to gain from moving it before critics
+themselves move).
+
+**Verified, not just written:**
+- Default build (`TGMPPI_WITH_CUDA` unset): unchanged, clean, 0 warnings,
+  2min11s -- confirms zero regression risk to what's actually driving the
+  robot today.
+- `-DTGMPPI_WITH_CUDA=ON` build: compiles and links `libtgmppi_controller.so`
+  against LibTorch cleanly, 0 compiler warnings, 2min49s (only cosmetic
+  upstream LibTorch CMake warnings, e.g. missing NVTX3).
+- **Numeric parity**: a standalone test (compiles the *real*
+  `gpu_rollout.cpp` directly, not a reimplementation) feeds identical
+  random noise into both the xtensor CPU formula and `GpuRollout`, across
+  4 (batch, timesteps) shapes including the real K=2000/T=56. Max
+  abs-diff on x/y/yaw ~1e-7 (float32 cumsum accumulation-order noise,
+  nothing more); vx/wz bit-identical. All 4 cases PASS.
+- **Honest timing** at the real shape (K=2000, T=56, 200-iteration
+  average, warm CUDA context): CPU(xtensor)=1.980 ms/cycle,
+  GPU(libtorch, incl. upload+download)=2.987 ms/cycle -- **0.66x, GPU is
+  slower for this slice alone.** Expected and stated up front: a K=2000x56
+  tensor is small enough that PCIe transfer + kernel-launch overhead isn't
+  amortized by predict+integrate's own compute, which is trivial for AVX2
+  to chew through already. The real payoff requires the critics (the
+  actual bulk of per-cycle cost) to also run on GPU, so the upload/download
+  happens once per cycle instead of being pure overhead on top of an
+  otherwise-unmoved CPU pipeline. Next slice: pick one critic (likely
+  `obstacles_critic` or `cost_critic`, the two used for every trajectory
+  regardless of TG-MPPI mode) and port it the same way (additive class,
+  same parity-test discipline) before deciding whether the end-to-end
+  number justifies continuing to the rest.
+
+Build command for the CUDA path (not wired into any launch file --
+opt-in only):
+```
+colcon build --packages-select nav2_tgmppi_controller --symlink-install \
+  --cmake-args -DTGMPPI_WITH_CUDA=ON \
+    -DCMAKE_PREFIX_PATH=$HOME/libtorch_cu126/libtorch \
+    -DCMAKE_CUDA_COMPILER=/usr/local/cuda-12.6/bin/nvcc
+```
+`$HOME/libtorch_cu126/libtorch/lib` must be on `LD_LIBRARY_PATH` at
+launch time too (runtime dlopen dependency of the plugin `.so`).
