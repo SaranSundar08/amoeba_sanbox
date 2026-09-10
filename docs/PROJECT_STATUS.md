@@ -1297,3 +1297,64 @@ consolidated pipeline, not thrown away; what changes is who owns the
 upload/download (a new persistent-tensor session spanning the whole
 cycle, not each piece for itself). Not yet designed in detail or
 started -- next actual step.
+
+## 2026-09-10 (continued): GPU port -- consolidation, real result
+
+Refactored `GpuRollout` and `GpuCostCritic` to separate upload/download
+from pure device-resident compute: each gained a `computeDevice()`
+(rollout) / `computeDevice()`+`uploadCostmap()` (cost critic) method that
+takes/returns already-on-GPU tensors, doing zero host<->device traffic
+itself. The original `rollout()`/`score()` methods are now thin
+upload -> computeDevice -> download wrappers around these, so every
+existing parity test (slices 1 and 2) still exercises identical behavior
+unchanged -- re-ran both after the refactor, still exact/near-exact
+match, confirming no regression from the restructuring itself.
+
+**Design that avoided inventing an unnecessary class**: first drafted a
+combo `GpuCycle` orchestrator owning both sub-components, then realized
+`CriticData` already threads shared resources (costmap, flow_field) to
+critics every cycle -- so instead just added
+`const void * gpu_rollout` there (opaque pointer, cast to
+`const GpuRollout*` only where `TGMPPI_WITH_CUDA` is defined; deleted the
+`GpuCycle` files as unnecessary before they were ever built). `Optimizer`
+sets it to `&gpu_rollout_` after running the rollout on GPU (nullptr
+otherwise, including on the default build). `CostCritic::score()`'s GPU
+branch now checks it: if non-null, calls
+`gpu_critic_.computeDevice(rollout->trajX(), rollout->trajY(), ...)`
+directly -- reading the rollout's already-resident trajectory tensors,
+uploading only its own costmap -- instead of re-uploading trajectories.x/y
+itself. This design generalizes: any future GPU-ported critic reads the
+same shared `data.gpu_rollout` pointer, so the "one shared upload" benefit
+keeps compounding as more critics join, with no combinatorial
+orchestrator class needed per new pairing.
+
+**Verified**: both build configs clean (default unaffected; CUDA build
+3min3s, only the same two cosmetic upstream LibTorch warnings as before).
+A new standalone test chains `computeDevice()` calls exactly as
+`CostCritic::score()`'s new branch does, confirms exact parity against a
+composed CPU reference (max traj diff 1.19e-7, exact repulsive-cost
+match), and runs the real 3-way timing comparison at K=2000/T=56/200x200
+costmap:
+
+| | ms/cycle | vs CPU |
+|---|---|---|
+| A) CPU only (rollout+CostCritic) | 2.016 | 1.00x |
+| B) independent GPU (2 round trips, slices 1+2 as built) | 4.421 | 0.46x |
+| C) chained GPU (1 round trip, this consolidation) | 3.748 | 0.54x |
+
+**Consolidation works exactly as predicted** -- C is a real, measured
+1.18x improvement over B, from removing exactly one redundant upload
+(trajectories.x/y, already resident from the rollout). It is **still
+behind CPU** with only two pieces sharing the one round trip; the
+fixed cost of even a single upload+several-kernel-launches+download
+isn't yet amortized by just this much chained compute. The trend is the
+right one for the hypothesis in the previous entry: each additional critic
+chained onto the same shared `data.gpu_rollout` tensors adds real compute
+with ZERO additional round-trip cost, so the ratio should keep improving
+as more critics join -- unconfirmed until an actual third critic is
+chained, not assumed from two data points. That's the next concrete step
+if this is continued: pick one more of the active critics (ConstraintCritic
+or GoalCritic look like the next-simplest -- small, dense elementwise
+math, no per-point costmap lookup) and chain it onto the same
+`data.gpu_rollout` tensors the same way, to see whether 3 pieces crosses
+the line CPU still holds at 2.
