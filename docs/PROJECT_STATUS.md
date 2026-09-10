@@ -1221,3 +1221,79 @@ colcon build --packages-select nav2_tgmppi_controller --symlink-install \
 ```
 `$HOME/libtorch_cu126/libtorch/lib` must be on `LD_LIBRARY_PATH` at
 launch time too (runtime dlopen dependency of the plugin `.so`).
+
+## 2026-09-10 (continued): GPU port slice 2 -- CostCritic, and an architectural pivot
+
+**First correction before starting**: user asked to port `ObstaclesCritic`.
+It's commented out in both live campaign yamls -- `CostCritic` does the
+same job (near-identical `costAtPose`/`inCollision` structure) and is
+what's actually running. Ported `CostCritic` instead; `ObstaclesCritic`
+stays CPU-only and untouched (not in the active critics list either way).
+
+**Design, same additive pattern as slice 1**: added
+`const std::string & compute_backend` to `CriticData` (propagated from
+`OptimizerSettings::compute_backend`), so any critic can see which
+backend is active without a new per-critic param. New `GpuCostCritic`
+class (`tools/gpu_cost_critic.hpp`/`.cpp`, same `#ifdef TGMPPI_WITH_CUDA`
+empty-TU-by-default pattern as `GpuRollout`) implements
+`CostCritic::score()`'s **circular-mode** collision check only
+(`consider_footprint:false` -- the active yaml setting); footprint mode
+needs per-point polygon rasterization (`footprintCostAtPose`), doesn't
+vectorize the same way, and isn't attempted here.  `CostCritic::score()`
+checks `data.compute_backend=="cuda" && !consider_footprint_ &&
+gpu_critic_.ready()` and only then calls the GPU path; otherwise the
+original CPU loop is untouched.
+
+The CPU version's early-break-on-first-collision doesn't need
+reproducing on GPU: a colliding trajectory's cost gets unconditionally
+overwritten with `collision_cost` regardless of what partial sum
+preceded the break, so the GPU version sums every point unconditionally
+(a batched costmap gather + elementwise ops) and applies the same
+override afterward -- verified equivalent by the parity test, not just
+argued.
+
+**Verified:**
+- Default build: unchanged (this file's contents are `#ifdef`'d out
+  entirely without the flag).
+- `-DTGMPPI_WITH_CUDA=ON`: **caught a real bug** on first attempt --
+  `-Werror=unused-but-set-variable` on a leftover `cuda_opts_f32` that
+  only exists in this code path, so the earlier default-build regression
+  check couldn't have caught it. Fixed, rebuilt, clean, 0 warnings
+  (only the same two cosmetic upstream LibTorch CMake warnings as
+  slice 1), 3min4s. **Lesson reinforced: "the default build passed"
+  proves nothing about the CUDA path -- always rebuild both configs
+  after touching anything under a TGMPPI_WITH_CUDA guard.**
+- Numeric parity: real `gpu_cost_critic.cpp` vs a hand-verified xtensor
+  reference, on a synthetic 200x200 costmap (matching the real 5m local
+  costmap at 0.025m resolution) with realistic free/inflated/lethal/
+  unknown cost distribution. 4 cases (varying `track_unknown_space` and
+  `near_goal`), **exact match (0.0 diff)** -- this critic's math is pure
+  integer costmap values, no floating-point accumulation-order noise
+  like the rollout's trig/cumsum had.
+
+**Honest timing** at the real shape (K=2000, T=56, 200x200 costmap,
+200-iteration average): CPU(xtensor)=0.408 ms/cycle,
+GPU(libtorch)=0.943 ms/cycle -- **0.43x, GPU slower again.**
+
+**This is now a pattern, not a fluke, and it changes the plan.** Slice 1
+(rollout): 0.66x. Slice 2 (CostCritic): 0.43x. Both losses have the same
+root cause: each piece does its *own* independent upload -> compute ->
+download round trip, and for a K=2000x56 workload the PCIe transfer +
+CUDA kernel-launch overhead (each launch ~5-20us, several per op) swamps
+compute that AVX2 already does cheaply. Porting a third critic the same
+way would just add a third data point confirming the same limitation --
+**the round-trip overhead compounds with every additively-ported piece
+instead of amortizing.** The actual fix is architectural: stop crossing
+the CPU<->GPU boundary per critic. Upload the noised+biased state (+
+costmap, path) once at the top of `Optimizer::optimize()`'s cycle, run
+the rollout AND every critic's cost chained together on tensors that
+stay resident on the GPU the whole time, download the final softmax
+result once at the bottom. Presented this finding + the three options
+(consolidate now / port more critics first then consolidate / stop here)
+to the user explicitly rather than silently continuing the losing
+pattern -- **decision: consolidate now.** `GpuRollout`'s and
+`GpuCostCritic`'s math get reused as the compute kernels inside the
+consolidated pipeline, not thrown away; what changes is who owns the
+upload/download (a new persistent-tensor session spanning the whole
+cycle, not each piece for itself). Not yet designed in detail or
+started -- next actual step.
