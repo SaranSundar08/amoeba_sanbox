@@ -1062,3 +1062,81 @@ src` (a real symlink at every hop, not just the endpoints) via
 `grep`. **Any future edit to a file in this package should have its
 install-space symlink verified with `readlink -f`, not assumed** -- a
 partial rebuild is not proof every file in the package is live.
+
+## 2026-09-10: nav2_amoeba_mppi_controller cleanup + full amoeba->tgmppi rename
+
+User audit request ("how far and what features from the sandbox are
+implemented here") led to two follow-up asks: strip out the controller's
+previous-implementation cruft, and rename the whole nomenclature from
+"amoeba" to "tgmppi" while already touching the code. Both are done and
+build-verified.
+
+**Safety first**: neither `nav2_amoeba_mppi_controller` nor `susag_nav2`
+had ever been under version control. Before any edit, `git init` +
+baseline commit in both, so the rename/deletion has a real revert path.
+
+**Build-crash lesson (own mistake)**: the very first rebuild attempt ran
+unthrottled `colcon build` on this 20-core/15GB-RAM/**zero-swap** machine.
+Default parallelism (up to 20 concurrent xtensor/-O3/-ffast-math compiles,
+each GB-hungry) exhausted RAM with nothing to page to -- full system
+lockup, user had to hard-reset. Every build after that used
+`MAKEFLAGS="-j1"` (or `-j2` for the lightweight config-only `susag_nav2`)
++ `colcon --parallel-workers 1`, run backgrounded under a `free -m`
+watchdog that kills the build outright if available memory drops toward
+~1.5GB. No further incidents; **this machine should never again run a
+colcon build without an explicit job cap**.
+
+**Cleanup (dead code removal, zero behavior change)**: both live campaign
+yamls ran `amoeba_mode: "flow"` exclusively, so the alternate `"ray"`
+polar-gap-scan mode (`computeAmoebaModes()`, `applyAmoebaBias()`,
+`buildWrapSequence()`, `amoebaCostAt()`, `publishAmoebaDebug()`, and all
+`amoeba_seq_*`/`amoeba_path_*`/`amoeba_bearing_*`/`dbg_ray_*` state) was
+live but unreachable -- deleted. `PathAlignLegacyCritic` was registered in
+pluginlib but absent from both active `critics:` lists -- deleted
+(`.cpp`/`.hpp`, `CMakeLists.txt` line, `critics.xml` entry). Verified with
+a capped `colcon build`, clean exit 0, 2min 11s.
+
+**Rename**: package `nav2_amoeba_mppi_controller` -> `nav2_tgmppi_controller`
+(dir + include/ subdir moved with `git mv`), namespace `amoeba::` ->
+`tgmppi::`, class `AmoebaController` -> `TgMppiController`, all
+`amoeba_*` params -> `tgmppi_*`, topics `/amoeba_debug` -> `/tgmppi_debug`
+and the three `/amoeba/ancillary_{path,rollout}_N` pairs -> `/tgmppi/...`,
+CMake lib targets `amoeba_controller`/`amoeba_critics` ->
+`tgmppi_controller`/`tgmppi_critics`. Applied by a scripted 4-rule
+case-variant substring replace (`amoeba_mppi`->`tgmppi` first, to collapse
+the compound package-name token, then `AMOEBA`/`Amoeba`/`amoeba` ->
+`TGMPPI`/`TgMppi`/`tgmppi`) across all 55 source files. The script's first
+pass missed one thing: header guards use the *uppercase* `AMOEBA_MPPI`
+compound (`NAV2_AMOEBA_MPPI_CONTROLLER__...`), which only the lowercase
+collapse rule was written for -- produced `NAV2_TGMPPI_MPPI_CONTROLLER__`
+(doubled MPPI) until a follow-up pass fixed it. Verified zero `amoeba`
+(case-insensitive) remains in any tracked file, then a capped rebuild with
+`-Wall -Wextra -Wpedantic -Werror`: exit 0, 2min 12s, zero warnings.
+
+**Downstream (`susag_nav2`)**: `navigation_amoeba.yaml` ->
+`navigation_tgmppi.yaml`, `navigation_amoeba_tight.yaml` ->
+`navigation_tgmppi_tight.yaml`, `benchmark_amoeba.py` ->
+`benchmark_tgmppi.py` (all `git mv`, history preserved); `plugin:` field,
+every `amoeba_*` param key, and RViz topics/marker-namespace toggles
+updated to match. Also fixed the now-stale
+`navigation_amoeba*.yaml` cross-reference comments left in
+`navigation_sim.yaml`/`navigation_sim_tight.yaml` from the earlier
+parameter-matching pass, and `benchmark_barn.py`'s controller registry.
+Hit the **same stale-symlink trap** documented above: after the file
+rename, `install/susag_nav2/share/susag_nav2/param/` still had symlinks
+named `navigation_amoeba*.yaml` pointing at now-nonexistent `src/` paths
+(a `--symlink-install` rebuild adds new symlinks for new files but does
+not remove orphaned old ones) -- found via `find -xtype l` and deleted by
+hand.
+
+**Deliberately left alone**: `benchmark/logs/*amoeba*.log` (historical
+run records -- renaming them would misrepresent what was actually run
+under the old name); the Python sandbox's own "Amoeba" naming
+(`amoeba_controllers.py`, `AmoebaHybrid`, etc.) -- separate, already-
+published research code, explicitly out of scope for this rename.
+
+**Not started**: the GPU (LibTorch/CUDA) port of the live controller,
+discussed and scoped earlier this session but superseded by this cleanup
+request. Still the agreed next step if the user wants to continue down
+that path -- a genuinely separate, multi-day C++/CUDA undertaking, not
+something to start opportunistically at the tail of this session.
