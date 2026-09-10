@@ -1358,3 +1358,54 @@ or GoalCritic look like the next-simplest -- small, dense elementwise
 math, no per-point costmap lookup) and chain it onto the same
 `data.gpu_rollout` tensors the same way, to see whether 3 pieces crosses
 the line CPU still holds at 2.
+
+## 2026-09-10 (continued): GPU port -- 3 chained pieces cross over CPU
+
+Chained `GoalCritic` onto the shared `data.gpu_rollout` tensors the same
+way as `CostCritic`: pure elementwise distance-to-goal math over
+already-rolled-out trajectories, no costmap, so this critic needs **no
+upload of its own at all** when chained -- `goal_x`/`goal_y` are two
+scalar kernel arguments, not tensors -- only a `[K]` download of its
+result. `GpuGoalCritic` (`tools/gpu_goal_critic.hpp`/`.cpp`, same
+`computeDevice()`/standalone-`score()` split as the other two) added;
+`GoalCritic::score()` checks `data.gpu_rollout` exactly like
+`CostCritic::score()` does.
+
+**Verified**: both configs clean (default unaffected; CUDA build 3min24s,
+zero compiler warnings this time -- not even the earlier cosmetic
+LibTorch CMake ones). A new 3-critic standalone test (rollout +
+CostCritic + GoalCritic, all chained through one upload/download) passes
+parity exactly (repulsive-cost diff 0.0, goal-cost diff 5.72e-6) and
+measures the real question:
+
+| | ms/cycle | vs CPU |
+|---|---|---|
+| A) CPU only (3 pieces) | 3.985 | 1.00x |
+| B) independent GPU (3 round trips) | 5.238 | 0.76x |
+| C) chained GPU (1 round trip) | 3.915 | **1.02x** |
+
+**Crossed over.** Three chained pieces sharing one round trip is
+essentially at parity with CPU (slightly ahead, 1.02x) -- confirming the
+hypothesis from the previous two entries exactly: consolidation's fixed
+cost doesn't grow with each additional critic chained onto the same
+resident tensors, but the compute does, so the ratio climbs every critic
+added (0.54x at 2 pieces -> 1.02x at 3). This is genuinely the strongest
+result all session and the actual proof the redesign was worth doing --
+not just directionally right (slice-2-to-consolidation already showed
+that) but now demonstrably ahead of CPU with real, verified numbers.
+
+**Not yet true end-to-end**: the live controller runs 9 critics
+(`ConstraintCritic, CostCritic, GoalCritic, GoalAngleCritic,
+PathAlignCritic, PathFollowCritic, PathAngleCritic, PreferForwardCritic,
+FlowFieldCritic`), of which only CostCritic and GoalCritic are chained
+onto the GPU path so far -- the other 7 still run CPU-only, meaning
+`CriticManager::evalTrajectoriesScores()` today does rollout+2-critics on
+GPU (one round trip) THEN 7 more critics on CPU reading the downloaded
+trajectories, i.e. the download already had to happen for those 7
+regardless. The 1.02x number above is for the 3-piece slice in isolation,
+not a measurement of the whole `optimize()` cycle with all 9 critics
+active -- that end-to-end number (does moving 2 of 9 critics to GPU
+measurably speed up the real cycle, given the other 7's CPU cost and the
+still-happening download dominate the total) has NOT been measured and
+is the next honest thing to check before claiming a controller-level win,
+not just a component-level one.
