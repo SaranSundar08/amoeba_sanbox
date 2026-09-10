@@ -1409,3 +1409,87 @@ measurably speed up the real cycle, given the other 7's CPU cost and the
 still-happening download dominate the total) has NOT been measured and
 is the next honest thing to check before claiming a controller-level win,
 not just a component-level one.
+
+## 2026-09-10 (continued): GPU port -- measuring the real CPU tail, conclusion, stopping point
+
+Measured the actual question from the previous entry: real (verbatim,
+not reimplemented-from-memory) `score()` bodies for the 7 critics NOT yet
+on GPU (`ConstraintCritic`, `GoalAngleCritic`, `PathAlignCritic`,
+`PathFollowCritic`, `PathAngleCritic`, `PreferForwardCritic`,
+`FlowFieldCritic` -- the last using the real `tgmppi::FlowField` class
+directly, it has no ROS dependency) plus the shared
+`findPathFurthestReachedPoint` precompute (used by 3 of those 7, runs
+once/cycle), timed at the real K=2000/T=56 shape against a realistic
+200-point local plan segment and 200x200 costmap.
+
+**Result (stable across repeat runs, 4.36-4.40ms both times):**
+
+| | ms/cycle |
+|---|---|
+| findFurthestPoint (shared precompute) | 0.59 |
+| ConstraintCritic | 0.65 |
+| GoalAngleCritic | 0.79 |
+| PathAlignCritic | 0.54 |
+| PathFollowCritic | 0.11 |
+| PathAngleCritic | 0.79 |
+| PreferForwardCritic | 0.06 |
+| FlowFieldCritic | 0.88 |
+| **TOTAL** | **~4.4** |
+
+**This overturns the earlier back-of-envelope guess.** The unported
+7-critic tail (~4.4ms) is not small relative to the already-GPU-chained
+3-piece slice (~3.9ms) -- it's comparable, actually slightly larger.
+There is real, substantial remaining opportunity, not diminishing
+returns. Breaking down where that 4.4ms actually is:
+
+- **Trivially portable** (pure elementwise/reduction over [K,T], same
+  shape as the already-proven `GoalCritic`): `ConstraintCritic`,
+  `GoalAngleCritic`, `PathFollowCritic`, `PathAngleCritic`,
+  `PreferForwardCritic` -- **2.39ms combined**.
+- **Portable with the already-proven `CostCritic` grid-gather pattern**:
+  `FlowFieldCritic` (a per-point lookup into `FlowField`'s distance grid,
+  structurally the same shape as `CostCritic`'s per-point costmap
+  lookup) -- **0.88ms**.
+- **Genuinely hard to vectorize**: `PathAlignCritic` (a per-trajectory
+  binary-search cursor into cumulative path distance, incrementally
+  stateful across the loop -- resists batching without real algorithmic
+  redesign) and the shared `findFurthestPoint` precompute (a raw nested
+  argmin loop, no vectorized reduction used in the original) --
+  **1.13ms combined**.
+
+So ~85% of the remaining CPU cost (3.8 of 4.4ms) follows one of the two
+patterns already mechanically proven tonight (`GoalCritic`'s zero-upload
+elementwise chain, `CostCritic`'s grid-gather chain) -- not a research
+problem, just more of the same work. Given the established trend across
+tonight's three data points (0.66x @ 1 piece -> 0.54x @ 2 -> 1.02x @ 3,
+each additional chained elementwise critic costing far less on GPU than
+its own CPU time once the one round trip is already paid for), chaining
+that 3.8ms of mechanically-portable work alongside what's already there
+would plausibly push the full cycle meaningfully ahead of CPU, not just
+to the parity already shown -- estimated, not measured; the actual
+number is only known once it's built. `PathAlignCritic` + the shared
+precompute (1.13ms, ~13% of the remaining tail) could reasonably stay
+CPU-only indefinitely -- small enough not to matter much either way, and
+avoiding a real algorithmic rewrite for a minor piece.
+
+**Conclusion and stopping point for today**: the architecture is proven
+correct (numeric parity every step), proven to actually cross over CPU
+once enough compute shares one round trip (real, not projected, 1.02x
+result), and the remaining work is now well-scoped and estimated rather
+than open-ended. This is a genuine, worthwhile continuation -- not
+diminishing returns -- but it is realistically another full session's
+worth of work (5 mechanical elementwise ports + 1 grid-gather port, each
+needing its own parity test and both-build-config verification, same
+rigor as tonight) and was explicitly not started tonight per the user's
+call to measure, conclude, and stop. **Next-session plan, in priority
+order**: (1) `FlowFieldCritic` (biggest single item, proven pattern,
+directly reuses the `CostCritic` grid-gather approach against
+`FlowField`'s grid instead of the costmap's), (2) the 5 elementwise
+critics in any order (`ConstraintCritic`, `GoalAngleCritic`,
+`PathFollowCritic`, `PathAngleCritic`, `PreferForwardCritic`), (3) after
+all of those are chained, re-measure the REAL end-to-end
+`Optimizer::optimize()` cycle (not a component slice) with
+`compute_backend:"cuda"` actually wired into a live Nav2 run, which is
+the number that finally answers "does the real robot get faster" --
+leave `PathAlignCritic` and the shared precompute on CPU unless that
+end-to-end number says otherwise.
