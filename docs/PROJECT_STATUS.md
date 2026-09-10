@@ -1005,3 +1005,42 @@ will show nothing under this controller (it never publishes them) --
 expected, not a fault; `/trajectories` (the sample cloud) and
 `/transformed_global_plan` are published by both controllers and remain
 meaningful for either.
+
+## Foxglove as an alternative to RViz (2026-09-10)
+
+Both `foxglove-studio` (3.1.1, desktop app) and `ros-humble-foxglove-bridge`
+(3.4.3) are already installed -- no setup needed beyond wiring the bridge
+into the launch. Added a `foxglove` arg (default `false`, independent of
+`rviz`) to `navigation.launch.py` that conditionally includes
+`foxglove_bridge`'s own `foxglove_bridge_launch.xml`, with `use_sim_time`
+wired through from the existing `sim` arg (mirrors the `rviz` Node's own
+`use_sim_time` parameter) and the port exposed as `foxglove_port` (default
+8765). Smoke-tested live: `ros2 launch susag_nav2 navigation.launch.py
+foxglove:=true rviz:=false sim:=true` starts `foxglove_bridge`, binds
+`0.0.0.0:8765`, and immediately advertises real topics (`/front_scan`,
+`/tf`, `/map`, `/particle_cloud`, etc.) -- confirmed via `ss -ltnp` and the
+node's own log, then torn down cleanly (port free afterward).
+
+Motivation beyond preference: RViz has crashed repeatedly this session
+(see the librclcpp segfault entry above) in a subscription-teardown class
+tied to rclcpp's own client library. `foxglove_bridge` is a single rclcpp
+node holding the subscriptions; Foxglove Studio itself is a separate
+process talking over a websocket, not an rclcpp node -- so the same crash
+class cannot reach the visualization client directly. Not proven fixed,
+but architecturally sidesteps the specific failure mode.
+
+Not carried over automatically: RViz's `susag_nav.rviz` layout (the
+TG-MPPI group, per-branch colours, etc.) has no equivalent in Foxglove's
+own JSON layout format -- there is no converter between the two. The same
+topics work directly in Foxglove's 3D panel (`/amoeba_debug`,
+`/amoeba/ancillary_path_1..3`, `/amoeba/ancillary_rollout_1..3`,
+`/transformed_global_plan`, `/trajectories`, `/front_scan`, `/rear_scan`,
+`/local_costmap/costmap`, `/global_costmap/costmap`), added and coloured
+by hand once; Foxglove does support saving/reusing a layout afterward.
+
+The `/amoeba_debug` performance caution from the RViz entry above applies
+identically here: `publishFlowDebug()`'s only gate is
+`get_subscription_count() == 0`, so subscribing to it from Foxglove costs
+the same ~31k-point rebuild every control cycle regardless of which
+client subscribes. Leave it un-added in Foxglove's panel except when
+capturing a still, exactly as in RViz.
