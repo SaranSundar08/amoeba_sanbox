@@ -1004,3 +1004,61 @@ The RViz TG-MPPI group's `/amoeba_debug`, `/amoeba/ancillary_*` displays
 will show nothing under this controller (it never publishes them) --
 expected, not a fault; `/trajectories` (the sample cloud) and
 `/transformed_global_plan` are published by both controllers and remain
+meaningful for either.
+
+## Ground-truth pose plugin, and a stale-install lesson repeated (2026-09-10)
+
+Reported symptom: laser scans still drift specifically when turning, even
+after the front/rear lidar rewiring. Ruled out one candidate directly:
+`wheel_separation: 0.74` in the diff_drive plugin (declared twice,
+redundantly, but with identical values) exactly matches the real geometry
+(URDF wheel joints at y=+-0.37 m) -- not a mismatch.
+
+Two candidates remain, and they need different fixes, so added
+`libgazebo_ros_p3d` to `susag_new_model/urdf/susag_updated_model.gazebo`
+on `base_link`, `frame_name: world`, zero noise, publishing
+`/ground_truth/odom` -- Gazebo's actual simulated rigid-body pose,
+independent of whatever the drive plugin assumes about wheel slip.
+Verified live: publishes at ~23.6 Hz, first message
+`x=-2.2500, y=1.0000` in `frame_id: world` -- an exact match to the
+robot's spawn pose (`gazebo_barn.launch.py`'s `x_pose=-2.25, y_pose=1.0`).
+
+**How to use it:** launch normally, send a pure rotation
+(`ros2 topic pub -r 10 /cmd_vel geometry_msgs/msg/Twist
+"{angular: {z: 0.5}}"` for a few seconds, then stop), and compare `/odom`
+against `/ground_truth/odom` over that window.
+- If they track together: any observed drift is the TF/`use_sim_time`
+  clock mismatch flagged earlier this session (`navigation.launch.py`'s
+  `sim` arg still defaults to `false`) -- fix is always passing
+  `sim:=true`.
+- If they diverge specifically during rotation: Gazebo is genuinely
+  simulating skid-steer slip. This chassis has no steering DOF (all four
+  wheel joints are `continuous`, axis `(0,1,0)` only -- confirmed in the
+  URDF) and turns purely by scrubbing the wheels against the ground;
+  `libgazebo_ros_diff_drive` publishes `/odom` from ideal no-slip
+  kinematics, so a real physics-simulated slip during rotation would not
+  match it. This is not a bug to patch -- it is the same phenomenon
+  `robot_model.py`'s `yaw_gain`/`speed_yaw_loss` already models for the
+  real robot (see V6, `docs/PROJECT_STATUS.md`'s 2026-08-03 entry); the
+  remediation is a design choice (accept it as realistic, or switch to a
+  kinematic drive plugin such as `libgazebo_ros_planar_move` if a
+  slip-free baseline is wanted for controller-only testing), not a
+  one-line fix.
+
+**Stale-install lesson, repeated from 2026-09-09's launch-file incident:**
+the installed copy of this exact `.gazebo` file was a **plain file, not a
+symlink** (dated the previous day, missing this session's own edit)
+despite `susag_updated_model_description` having been rebuilt with
+`--symlink-install` on 2026-09-09 for an unrelated fix (the Gazebo-world
+scale). That rebuild evidently symlinked the file it was explicitly
+checked for (the launch file) but left this one a stale copy from before
+this session started -- colcon's symlink-install does not necessarily
+relink every file in a package on a partial rebuild if it considers the
+destination already present. Re-ran
+`colcon build --packages-select susag_updated_model_description
+--symlink-install`; confirmed the full chain is now `install -> build ->
+src` (a real symlink at every hop, not just the endpoints) via
+`readlink -f`, and confirmed the resolved content matches source via
+`grep`. **Any future edit to a file in this package should have its
+install-space symlink verified with `readlink -f`, not assumed** -- a
+partial rebuild is not proof every file in the package is live.
