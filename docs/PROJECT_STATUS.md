@@ -1493,3 +1493,68 @@ all of those are chained, re-measure the REAL end-to-end
 the number that finally answers "does the real robot get faster" --
 leave `PathAlignCritic` and the shared precompute on CPU unless that
 end-to-end number says otherwise.
+
+## 2026-09-11: GPU port -- FlowFieldCritic, a much bigger win than expected
+
+Continued the plan from yesterday's stopping point: `FlowFieldCritic`
+first (identified as the biggest single remaining item and a proven-shape
+candidate -- a per-point grid gather, structurally identical to
+`CostCritic`'s costmap gather, just against `FlowField`'s distance grid
+instead). `FlowField::distAt()` turned out even simpler than
+`CostCritic`'s `costAtPose()`: it always clamps to the grid rather than
+special-casing out-of-bounds, so `GpuFlowFieldCritic::computeDevice()`
+needs no in-bounds mask at all. Added one small public accessor to
+`FlowField` (`distGrid()`, returning the whole `D_` buffer for bulk
+upload -- previously only `cellDist(i,j)` existed, one cell at a time).
+One float constant (`kDryPenalty = 2.0f`) had to be duplicated since it's
+private to `flow_field.cpp`'s anonymous namespace -- documented as a
+sync risk in the new file's docstring, not silently copied.
+
+Same wiring pattern as `CostCritic`/`GoalCritic`: `data.gpu_rollout`
+checked first (chains onto the rollout's resident trajectory tensors,
+uploading only the flow field's own grid), standalone `score()` as
+fallback. Both build configs verified clean, **zero warnings this time**.
+
+**Standalone parity**: exact match (0.0 diff).
+
+**Standalone timing was the surprise**: CPU=1.997ms/cycle,
+GPU(standalone)=0.267ms/cycle -- **7.48x**, a much bigger win than
+`CostCritic`'s or `GoalCritic`'s standalone numbers ever showed (both of
+those *lost* standalone). The reason: `FlowFieldCritic`'s CPU
+implementation is a raw, unvectorized double for-loop (112,000 individual
+`distAt()` calls, non-SIMD), unlike the xtensor-vectorized elementwise
+critics -- so its CPU baseline is much slower to begin with, and the
+GPU's batched gather wins even before accounting for the round-trip
+savings from chaining.
+
+**4-critic chained result** (rollout + `CostCritic` + `GoalCritic` +
+`FlowFieldCritic`, one upload/download, K=2000/T=56/200x200
+costmap/150-point path): exact/near-exact parity on all three critics'
+outputs (repulsive-cost and flow-cost diffs both 0.0, goal-cost 5.72e-6),
+and:
+
+| | ms/cycle | vs CPU |
+|---|---|---|
+| A) CPU only (4 pieces) | 4.910 | 1.00x |
+| B) independent GPU (4 round trips) | 2.073 | 2.37x |
+| C) chained GPU (1 round trip) | 1.629 | **3.01x** |
+
+Up from yesterday's 1.02x at 3 pieces to **3.01x at 4** -- a much larger
+jump than the previous per-critic increments, driven by `FlowFieldCritic`
+alone being worth more than the first three pieces combined. Chaining
+still beats independent by 1.27x, consistent with the established
+pattern (fixed round-trip cost shared, not per-critic).
+
+**Remaining scope, updated**: of the 5 elementwise critics not yet
+ported (`ConstraintCritic`, `GoalAngleCritic`, `PathFollowCritic`,
+`PathAngleCritic`, `PreferForwardCritic`, ~2.39ms combined per
+yesterday's CPU-only measurement) plus `PathAlignCritic` + the shared
+`findFurthestPoint` precompute (~1.13ms, left CPU-only), the single
+biggest lever (`FlowFieldCritic`) is now done. The remaining 5 are each
+individually cheap and mechanically identical to `GoalCritic` -- real
+but smaller incremental wins expected, not another 3x jump. Next actual
+step, in order: (1) port the 5 remaining elementwise critics (mechanical,
+same pattern each time), (2) measure the real end-to-end
+`Optimizer::optimize()` cycle wired into a live Nav2 run -- still not
+done, still the number that actually answers "does the robot get
+faster," not a component slice.
