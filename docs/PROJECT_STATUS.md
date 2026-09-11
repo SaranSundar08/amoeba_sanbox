@@ -1558,3 +1558,71 @@ same pattern each time), (2) measure the real end-to-end
 `Optimizer::optimize()` cycle wired into a live Nav2 run -- still not
 done, still the number that actually answers "does the robot get
 faster," not a component slice.
+
+## 2026-09-11 (continued): GPU port -- all 5 remaining elementwise critics done
+
+Ported the last 5 active critics not yet on GPU: `ConstraintCritic`,
+`GoalAngleCritic`, `PathFollowCritic`, `PathAngleCritic`,
+`PreferForwardCritic`. All five are single elementwise+reduction passes
+over already-resident state/trajectory tensors (same shape as
+`GoalCritic`), so bundled into one shared class, `GpuElementwiseCritics`
+(one `ready_` flag covers all five -- none holds persistent device
+state, matching the other Gpu*Critic classes). Scoped to what the active
+yaml actually exercises, same precedent as `CostCritic`'s
+`consider_footprint:false`-only: `ConstraintCritic`'s Ackermann branch
+(motion model is DiffDrive), `GoalAngleCritic`'s `symmetric_yaw_tolerance`
+(unset -> false), and `PathAngleCritic`'s reversing-corrected branch
+(`forward_preference` defaults true, never overridden) are all NOT
+implemented -- `score()` falls back to CPU whenever a critic's own
+config would need one of those, so nothing silently misbehaves if the
+yaml changes later.
+
+**Verified**: both build configs clean, zero warnings. Dedicated parity
+test (real `GpuElementwiseCritics` class, not reimplemented) -- all 5
+critics exact match (0.0 diff) against verbatim CPU references.
+
+**Built a comprehensive test chaining all 8 now-portable pieces**
+(rollout + all 8 critics except `PathAlignCritic`) through one
+upload/download, and hit a real bug in the *test harness* worth recording
+as a lesson: `GpuCostCritic::computeDevice()` uniquely returns the RAW
+repulsive sum (weight/traj_len scaling happens once in the caller,
+matching `CostCritic::score()`'s own design) while every other critic's
+`computeDevice()` already returns the fully-scaled cost internally. The
+first version of this test applied CostCritic's weight scaling twice in
+one place and not at all in another, producing a large, confusing
+mismatch (max diff ~6298) that had nothing to do with production code --
+confirmed by isolating each critic's CPU-vs-GPU diff individually (7 of
+8 were 0.0 immediately; `CostCritic` was the only one wrong, and only in
+the test's own composition logic). Fixed the test, not the production
+code, which was correct throughout. **Lesson for next time a critic is
+compared/composed manually: check whether its `computeDevice()` returns
+a raw or already-scaled value before assuming a uniform contract across
+all of them.**
+
+**Full 8-piece parity, after the fix**: exact match (0.0 diff) on every
+individual critic and the composed total.
+
+**Timing showed a real, reproducible bimodal split** across repeated
+runs of the identical binary -- worth reporting honestly rather than
+picking the best number: roughly half the runs land near chained=1.5ms
+(~5x vs CPU), the other half near chained=3.45ms (~2.2x vs CPU). CPU
+stayed rock-stable throughout (7.45-7.77ms across all 7 runs). GPU
+clock was confirmed at P0 (not throttled, 2565MHz) during testing, so
+this isn't simple thermal throttling -- more likely CUDA
+allocator/caching state varying between process launches. **Honest
+range: 2.2x-5.1x vs CPU for the 8-piece chain**, not a single point
+estimate. This variance itself is a finding worth carrying into the
+real end-to-end test: cycle-to-cycle GPU timing on this hardware isn't
+perfectly deterministic, so that measurement should average over many
+cycles, not trust a single reading.
+
+**Status**: every critic that follows the two proven patterns
+(elementwise/reduction, grid-gather) is now GPU-chained. Only
+`PathAlignCritic` (needs real algorithmic redesign for its serial
+binary-search cursor) remains CPU-only, by design, per the 2026-09-10
+plan. **Next and last step before any real conclusion**: wire
+`compute_backend:"cuda"` into an actual live Nav2 run and measure the
+real `Optimizer::optimize()` cycle end to end -- every component
+measurement so far has been a synthetic slice, not the real thing with
+all 9 critics + the softmax control update + real ROS/costmap overhead
+included.
