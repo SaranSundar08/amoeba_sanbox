@@ -1787,3 +1787,171 @@ measured verdict yet.
 port, visualization fix, nominal_fb port) is committed to the `SLIP` repo
 yet -- confirmed still sitting as uncommitted changes; that repo is the
 user's to commit/push per the established git-teaching arrangement.
+
+## 2026-09-13: grouped-sampling V3 port, space-time topology Phase 0+1, a real Gazebo dynamic-obstacle testbed, an AMCL finding, and a methodology bug caught and fixed
+
+User's framing for the day: "today is the final day I am porting stuff,
+from tomorrow it is just experimentation, documentation and report
+writing." Three more sandbox features attempted; two finished with real
+validation, one (space-time) reached a working-but-unverified-live state
+before the day's time ran out on the last diagnostic thread.
+
+**grouped-sampling V3** (`grouped_sampling.py`'s uncorrected within-mode
+weights): `Optimizer::updateControlSequence()` now supports
+`tgmppi_grouped_update` (default false, byte-identical to today's single-
+shared-softmax update). When true: each pseudopod's row block (+ the
+"wait" block, + the remaining unbiased rows) gets its own LOCAL softmax
+instead of one softmax over the whole batch; the single lowest-free-
+energy group's own weighted mean becomes the new control sequence,
+replacing the blend-everything-together approach. No cross-cycle
+hysteresis (sandbox's `select_mode()` switch_margin) -- that needs stable
+pseudopod identity across reflood cycles, itself an explicitly unsolved,
+deferred sandbox problem ("topological branch re-ID"). Hit and fixed one
+real xtensor compile error (`xt::view` doesn't accept a pre-stored
+`xt::range(...)` value passed through a variable -- inline the range
+expression at each call site instead). Both configs verified clean.
+**Not yet validated live against a real before/after comparison.**
+
+**Space-time topology, Phase 0**: `SpaceTimeSearch` (new, zero ROS/xtensor/
+torch dependency -- pure C++ standard library) ports `time_expanded_
+search()`/`two_route_search()`: a Dijkstra search over a discretized
+(x,y,t) grid, avoiding static costmap cells and a predicted moving
+obstacle, constructing genuine "wait for it to pass" vs. "go around/
+before it arrives" routes via a cheap-vs-expensive wait-cost trick (the
+sandbox's own mechanism for forcing two truly distinct minimum-cost
+strategies rather than two labels on the same path). **Validated directly
+against the real `spacetime.py`**: exact cost/feasibility/distinctness
+match on a test scenario, after finding and understanding (not
+papering over) a real float-vs-double tie-break: `goal_tol=0.15,
+res=0.10` computed in `float` lands on an EXACT .5 rounding boundary
+(`0.15f/0.10f == 1.5f` exactly) while the same division in double does
+not (`1.4999999999999998`), so `std::lround` rounds to a different
+integer than Python/numpy's `round()` at exactly this coincidental
+boundary. Tried "fix" by widening to double inside the function -- didn't
+work, because the imprecision is already baked into the caller's `float`
+parameters before the function ever sees them (float(0.15) widened to
+double is 0.150000005960..., not 0.15) -- documented as an inherent,
+unavoidable limitation instead (same class as `GpuFlowFieldCritic`'s
+round-vs-lround note), and re-verified parity using `goal_tol=0.17`
+to sidestep the coincidence. CPU-only by design: a Dijkstra search over
+tens of thousands of nodes is a small, inherently sequential graph
+algorithm, not a batch of independent parallel trajectories -- no
+meaningful GPU parallelization exists at this scale, matching every
+earlier lesson from this project's GPU port (small/serial workloads lose
+to round-trip overhead).
+
+**A real Gazebo dynamic-obstacle testbed, built from scratch.** The real
+published "DynaBARN" dataset (github.com/aninair1905/DynaBARN, an
+extension of the BARN Challenge for dynamic obstacles) was investigated
+as a shortcut -- its 60 premade worlds + pre-built Gazebo plugins were
+downloaded, but the plugins link against Gazebo 9 / ignition-common1 /
+boost 1.65.1, none present on this Gazebo 11 machine, and the repo ships
+no plugin source to rebuild against Gazebo 11 instead -- confirmed a hard
+dead end via direct `ldd`/`nm` inspection, not assumed. The repo's OWN
+generator script (`create_plugin_polynomial.py`) turned out to emit
+plain C++ using only long-stable `gazebo::common::PoseAnimation`-family
+APIs, though -- reimplemented that mechanism clean instead of reusing
+DynaBARN's binaries: a new `susag_gazebo_plugins` package
+(`OscillatingObstaclePlugin`, SDF-parameterized sinusoidal motion,
+`SetWorldPose` + `SetLinearVel` per tick) plus `libgazebo_ros_p3d` on the
+same model (the same plugin already used for the real robot's ground
+truth) for free ground-truth position+velocity regardless of what's
+animating the model -- exactly matching amoeba_sandbox's own
+`dynabarn.py`, which ALSO uses ground-truth oracle position/velocity
+(the environment's own known oscillator state), not real sensor-based
+tracking, despite the docstring's "controller-side tracker" framing.
+Caught and fixed a real Gazebo gotcha: `SetWorldPose()` alone teleports
+the pose without updating the physics engine's own velocity state, so
+anything reading link velocity (p3d's twist field) sees near-zero/garbage
+values -- fixed by also calling `SetLinearVel()` with the same analytic
+derivative each tick.
+
+First placement attempt (radius 0.25m, amplitude 0.6m, guessed at a
+naive "corridor centerline" from the launch file's own comment) was
+wrong -- confirmed live by the user: one of the two obstacles collided
+badly with static pillars. Root cause: this BARN course has NO wide-open
+band anywhere in the field at that centerline x -- it's narrow
+throughout, not just at specific pinch points, so guessing a "safe-
+looking" coordinate without checking real clearance data doesn't work.
+Fixed properly the second time: loaded `BARN_dataset/grid_files/
+grid_48.npy` (the real 30x30 occupancy grid, 0.15m resolution) and
+computed genuinely clear pockets by scanning clearance against every
+occupied cell for a given oscillation band, not guessed. One obstacle
+(the one confirmed fine live) kept its original placement; only the one
+confirmed bad was re-scoped to a much smaller cylinder (radius 0.08m,
+amplitude 0.20m) at a grid-verified clear spot.
+
+**Phase 1 wiring into `Optimizer`**: `tgmppi_spacetime_enabled` (default
+false) + ground-truth Odometry subscriptions per configured obstacle
+topic + `nearestCrossingObstacle`-equivalent trigger (checked per
+pseudopod, at the search's own implied speed, not the pseudopod's actual
+achieved speed -- matching the sandbox's `_spacetime_alternatives`
+exactly) + `two_route_search` call + a SIMPLIFIED path-to-reference
+step (linear-interpolation resample onto the MPPI's own time grid,
+finite-difference velocity -- the sandbox's `spacetime_path_to_proposal`
+additionally reprojects through acceleration limits and re-rolls-out to
+recheck feasibility on the achieved trajectory; skipped here as a
+declared, documented scoping simplification given the day's timeline, not
+an oversight). Single-crossing budget: stops at the first pseudopod with
+a detected crossing, capped at 2 extra modes (wait + detour) rather than
+the sandbox's per-branch loop, to fit the ancillary-mode bookkeeping
+(extended 3->5 fixed slots) without a larger refactor. Caught and fixed a
+real bug before it shipped: initially reused `tgmppi_body_radius` (the
+flow field's flood extent, default 2.5m) as the robot's physical radius
+for collision-margin math -- wrong parameter, unrelated concept that
+happens to share the word "radius"; fixed to
+`costmap_ros_->getLayeredCostmap()->getInscribedRadius()`, the actual
+robot-safety radius Nav2 itself uses.
+
+**A real methodology bug, caught mid-session and disclosed rather than
+buried**: every "default (non-CUDA) build regression check" this WHOLE
+project has run (not just today) reused the same persistent
+`build/nav2_tgmppi_controller` directory across colcon invocations,
+omitting `-DTGMPPI_WITH_CUDA` on the "default" runs rather than
+explicitly passing `=OFF`. CMake caches the last explicitly-set value of
+a cache variable; omitting a flag on a later invocation does NOT reset it
+to the `option()` declaration's default. Verified directly: `grep
+TGMPPI_WITH_CUDA CMakeCache.txt` showed `BOOL=ON` on a build labeled and
+reported as the "default" config. This means every "default build
+verified clean" claim made across this entire GPU-port effort may have
+silently still been building with CUDA on the whole time -- the true
+non-CUDA path was never actually separately regression-tested until
+caught today. Fixed by passing `-DTGMPPI_WITH_CUDA=OFF` explicitly; the
+resulting genuine default build (containing ALL of this project's
+cumulative changes, not just today's) passed clean -- so nothing is
+actually left unverified, but the PROCESS gap itself is worth remembering
+for any future colcon session reusing a build directory across configs.
+
+**A live test surfaced a real, separate finding, not a code regression**:
+launching the full stack on `world_48_dynamic` for the first time, the
+global planner failed (`ComputePathToPose: FAILURE`) with a measured
+~0.5m AMCL-vs-ground-truth Y offset. Root cause, confirmed via AMCL's own
+params: `z_hit: 0.9` / `z_rand: 0.05` means AMCL's likelihood-field model
+treats a laser beam that doesn't match the STATIC map (e.g. one that hit
+a moving obstacle the map has no idea exists) as strong evidence AGAINST
+the correct pose, since it barely tolerates "unexplained" readings. This
+is a real, known Nav2/AMCL tuning problem for any environment with
+obstacles the localization map doesn't know about -- not a bug introduced
+by any of today's TG-MPPI-side work. Fixed in `navigation_tgmppi_
+tight.yaml`: raised `z_rand` 0.05->0.20, lowered `z_hit` 0.9->0.75,
+tightened `update_min_a`/`update_min_d` (0.18/0.12 -> 0.12/0.08) for
+faster reaction in tight/dynamic spaces. **Not yet re-tested live** --
+session ended on this exact open thread (relaunch queued, not run) after
+the localization-recovery detour (manually wiggling via
+`teleop_twist_keyboard` to help AMCL converge, which DID work as a
+stopgap -- AMCL-vs-ground-truth gap closed from ~0.5m to ~0.06m over a
+few seconds of motion -- but confirmed too slow/manual for real dynamic-
+environment use, motivating the `z_rand` fix as the real solution instead
+of a workaround).
+
+**Honest end-of-day state**: nominal_fb (Sept 11) and grouped-sampling V3
+both compile clean but are UNVALIDATED live. Space-time topology Phase 0
+is validated (against the Python reference); Phase 1 wiring compiles
+clean but is UNVALIDATED live, and the immediate blocker to validating it
+(bad AMCL behavior around the moving obstacles) was root-caused and
+fixed but not yet re-tested. Next session's first step, before anything
+else: relaunch `world_48_dynamic` with the new AMCL params and confirm
+localization holds without the manual-wiggle workaround, THEN actually
+exercise the space-time Phase 1 wiring live for the first time. None of
+today's SLIP-repo changes are committed yet -- still the user's to
+commit/push.
