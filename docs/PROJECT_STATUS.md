@@ -1626,3 +1626,164 @@ real `Optimizer::optimize()` cycle end to end -- every component
 measurement so far has been a synthetic slice, not the real thing with
 all 9 critics + the softmax control update + real ROS/costmap overhead
 included.
+
+## 2026-09-11 (continued): live Nav2 run -- a real production crash, root-caused and fixed, then the first genuine end-to-end number
+
+Wired `compute_backend:"cuda"` into `navigation_tgmppi_tight.yaml` and
+launched the real Gazebo+Nav2 stack for the first time with GPU active.
+**It crashed the instant a goal was sent** -- `nav2_container` (the
+composable-node container holding `controller_server`) died with a
+clean exit code 127 the moment the controller ran its first real control
+cycle. RViz's robot model vanishing and TF warnings were downstream
+symptoms of the controller disappearing, not a separate bug.
+
+Root-caused with a live `gdb -p <pid>` attach (`break abort`/`break
+exit`/`break _exit`, no signal-based crash to catch since the exit was
+clean) rather than guessing from logs: `GpuRollout::rollout()` called
+`tf2::getYaw()`, which needs `tf2::fromMsg(Quaternion)`. That function is
+header-declared `inline`, so it normally compiles away with no linkable
+symbol required. At `-O3`, this ONE call site -- uniquely among several
+others in the codebase that call the same `tf2::getYaw()` -- didn't get
+inlined, and no other `.cpp` in `libtgmppi_controller.so` happened to
+retain an out-of-line copy of the symbol. First real invocation ->
+`undefined symbol: tf2::fromMsg(...)` -> dynamic linker abort -> clean
+`_exit(127)`. This is the exact same fragile-inline-linkage quirk this
+project's own standalone parity tests have hit and worked around with an
+`anchor.cpp` file all along -- documented every time as "not a production
+concern, the real package's larger .so always keeps a copy somewhere."
+That assumption turned out false the first time a new GPU code path
+actually got exercised live. **Fixed at the root** rather than patched
+around: replaced the `tf2::getYaw()` call with the direct
+quaternion-to-yaw formula (`atan2(2(wz+xy), 1-2(y^2+z^2))`), removing the
+dependency on tf2's inline linkage entirely rather than adding another
+anchor-style linker trick to production code.
+
+Also found and fixed a real, independent inefficiency while investigating:
+`TgMppiController::computeVelocityCommands()` called
+`TrajectoryVisualizer::add()` (which builds a LINE_LIST marker from the
+*entire* candidate-trajectory batch -- thousands of points) unconditionally
+whenever `visualize:true`, regardless of whether anything was actually
+subscribed to `/trajectories`; only the final `publish()` call downstream
+checked the subscriber count. Added `TrajectoryVisualizer::isActive()` and
+gated the whole `add()`+`visualize()` call on it -- skips the expensive
+marker-building work entirely when RViz isn't open, unrelated to CPU vs
+GPU.
+
+**With both fixes in, the real end-to-end measurement** (cycle-timing
+instrumentation added directly to `Optimizer::evalControl()`, logging a
+rolling average every 50 cycles) -- the number every synthetic component
+slice this whole GPU-port effort had been building toward:
+
+| Backend | Avg cycle time | Samples |
+|---|---|---|
+| `cpu` | 8.45 ms | 650 cycles |
+| `cuda` | 4.87 ms | 400 cycles |
+
+**~1.73x real end-to-end speedup.** Lower than the 8-piece synthetic
+chain's 2.2x-5.1x range because that measurement excluded `PathAlignCritic`
+(still CPU-only at that point) and every synthetic benchmark necessarily
+excludes real TF lookups, costmap updates, and ROS message-passing
+overhead that the live controller actually pays every cycle.
+
+## 2026-09-11 (continued): PathAlignCritic ported -- GPU port of all 9 active critics now complete
+
+Closed the last gap. `PathAlignCritic`'s hot loop looked inherently
+serial (`findClosestPathPt()` carries a `path_pt` cursor forward across
+steps within one trajectory) but isn't: the underlying operation is
+`std::lower_bound` over a sorted per-path distance array, i.e.
+`torch::searchsorted`, and the "sequential" cursor is just a cumulative
+sum (`torch::cumsum`) of per-step trajectory distances. Ported as a small
+host-side loop over the ~13 strided sample points (`time_steps=56,
+trajectory_point_step=4`), each iteration vectorized across the whole
+batch -- the same loop-over-time/vectorize-over-batch shape `GpuRollout`
+itself already uses, not a new pattern.
+
+**One genuine correctness subtlety, found and deliberately preserved**:
+the real `findClosestPathPt()` searches only the *remaining* slice
+`[init, end)` of the array (`init` carried from the previous step), and
+when nothing in that remaining slice is `< dist`, it returns literal
+index `0` -- not `init`, not the true lower-bound answer. Very likely an
+unintentional upstream Nav2 quirk (a near-stationary MPPI sample trivially
+triggers it), but this project's rule throughout has been to match the
+real `.cpp`'s actual behavior, not a "corrected" version of it. Replicated
+exactly via a per-step gather-and-compare against each row's own carried
+`init`, rather than silently "fixing" it. (Separately: when `dist` exceeds
+every value in the array, the CPU code dereferences `vec.end()`
+unchecked -- undefined behavior with no well-defined answer to match; the
+GPU side clamps defensively instead of reproducing UB.)
+
+**Parity test built specifically to exercise this edge case**: 2000
+trajectories, 60 of them forced exactly stationary (zero commanded
+velocity) so their integrated distance stays at 0.0 every step, reliably
+triggering the "no advance -> return 0" branch on every single step for
+those rows, not just as a rare coincidence. Result: **exact 0.000000 diff
+across all 2000 rows**, stationary subset included. Both build configs
+clean, zero warnings. Standalone: 3.63x vs CPU for this critic alone.
+
+**All 9 active critics (`ConstraintCritic`, `CostCritic`, `GoalCritic`,
+`GoalAngleCritic`, `PathAlignCritic`, `PathFollowCritic`,
+`PathAngleCritic`, `PreferForwardCritic`, `FlowFieldCritic`) are now
+GPU-chained.** The live end-to-end number above (1.73x) predates this
+critic's inclusion -- it was NOT re-measured live with all 9 chained
+before the session moved on; that re-measurement is still open.
+Remaining CPU-only pieces, unchanged: noise generation
+(`NoiseGenerator::generateNoisedControls()`, plain `xt::random::randn`)
+and the softmax control-sequence update
+(`Optimizer::updateControlSequence()`) -- both simpler elementwise/
+reduction math than what's already ported, not yet measured, not yet a
+declared next step.
+
+## 2026-09-11 (continued): first sandbox-feature port into the Nav2 controller -- nominal_fb reference shaping
+
+Separate from the GPU work: the user asked directly whether everything
+from the `amoeba_sandbox` research codebase is reflected in the Nav2 C++
+controller. Answer, grounded in the actual `thesis-october-green-light-
+plan` record rather than guessed from filenames: no. The controller has
+the baseline TG-MPPI mechanism (flow field / pseudopod critics) but none
+of the sandbox's later research additions -- homotopy-consistency cost,
+space-time topology (`spacetime_flow`/`spacetime_modes`, both real but
+explicitly NOT statistically validated, p=0.195-0.316 at N=18), or the
+grouped/multi-modal per-branch sampling architecture (`grouped_sampling.py`
++ `proposals.py` + `pseudopods.py` -- the earlier-confirmed gap: the
+controller uses one shared softmax across the whole batch, not true
+per-branch updates).
+
+User picked `nominal_fb` (sandbox: `experiments/reference_distinctness.py`,
+`proposals.py`'s `branch_to_control_sequence()`) as the first one to port
+-- the only one of the unported features that's actually *validated*
+(passed the sandbox's real promotion gate, 21/24->22/24, zero
+regressions), and structurally the smallest change (reference-generation
+tuning, not a new sampling architecture).
+
+**The mapping isn't 1:1, and matters**: the sandbox formula is
+`desired_v = v_max * clearance_factor * curvature_factor * heading_factor`,
+where `nominal_fb` sets `min_speed_ratio=1.0` and `curvature_slowdown=0.0`,
+collapsing all three factors to 1.0 (drive the branch reference at full
+`v_max`, relying on `reference_infeasible_fallback` to catch the unsafe
+cases). The C++ controller already has a structurally equivalent
+mechanism -- `Optimizer::applyFlowBias()` builds a per-pseudopod ancillary
+(v,w) reference sequence exactly the way `branch_to_control_sequence()`
+does -- but it only ever implemented the heading-error term
+(`turn_scale = clip(cos(err), 0.15, 1.0)`, an exact match to the
+sandbox's `heading_factor`). There is no clearance-factor or
+curvature-factor term in this codebase to also disable; there never was
+one. So the honest port is: expose `turn_scale`'s floor as
+`tgmppi_reference_min_speed_ratio` (default 0.15, i.e. zero behavior
+change out of the box), and add `tgmppi_reference_infeasible_fallback`
+(default false): when a pseudopod's rollout at the configured floor turns
+out invalid, that one pseudopod is regenerated with the safe 0.15 floor
+instead, mirroring the sandbox's per-branch retry exactly. Implemented by
+extracting the per-pseudopod rollout into a lambda callable twice (once
+per floor) rather than duplicating the ~60-line reference-generation loop.
+
+Both build configs verified clean, zero warnings. Not yet validated with
+a real before/after comparison the way the sandbox's own promotion gate
+validated it -- built, wired to `tgmppi_reference_min_speed_ratio:1.0` +
+`tgmppi_reference_infeasible_fallback:true` in
+`navigation_tgmppi_tight.yaml`, and a live test run was started, but no
+measured verdict yet.
+
+**Outstanding at end of session**: none of this day's work (PathAlignCritic
+port, visualization fix, nominal_fb port) is committed to the `SLIP` repo
+yet -- confirmed still sitting as uncommitted changes; that repo is the
+user's to commit/push per the established git-teaching arrangement.
