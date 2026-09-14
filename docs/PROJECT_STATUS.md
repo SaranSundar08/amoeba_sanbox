@@ -2077,3 +2077,78 @@ still being cited) is the honest way to close this out, not assumed away.
 
 `navigation_sim.yaml`/`navigation_tgmppi.yaml` (the non-tight pair) were
 NOT audited this pass -- same open item as noted on 2026-09-09.
+
+## 2026-09-14 (evening): WHY TG-MPPI does not beat Nav2's stock MPPI in Gazebo -- answered from the sandbox's own frozen data
+
+Question from Saran: "why is TG-MPPI not performing better than the Nav2 MPPI
+controller in Gazebo?" Answered by cross-referencing the frozen sandbox results
+against what the live Gazebo monitor showed today. Every number below is from
+`artifacts/results/milestones/*` or `docs/experiments/FINAL_BENCHMARK_CONTRACT.md`.
+
+**1. Nav2's stock MPPI is not the sandbox's `vanilla`.** The contract defines
+`vanilla` = "ordinary MPPI with no global-path or amoeba proposal". Nav2 MPPI
+always tracks a NavFn global plan with PathAlign/PathFollow/PathAngle critics,
+i.e. it is the sandbox's `path_mppi` (39/50) or `path_biased` (45/50), not
+`vanilla` (25/50). The 25/50-vs-50/50 headline is against a baseline Nav2
+cannot even instantiate. Against the path-following baselines the static
+matrix gap is 3 worlds (0, 7, 48 for path_mppi) or 1 world (7 for path_biased).
+
+**2. In static BARN worlds the pseudopod mechanism is inactive BY DESIGN -- in
+the sandbox too.** Static matrix, `amoeba`, all 10 worlds x 5 seeds:
+`branch_selection_fraction = 0.000`, `fallback_selection_fraction = 1.000`,
+`assist_fraction ~ 0` (world 48: 0.013, world 7: 0.188, all others 0.000).
+The contract says it outright: "Amoeba pseudopods were available in ~74% of
+cycles, but an ancillary mode was selected in 0% of cycles; the path fallback
+remained selected... This pilot does not yet support the pseudopod-ancillary
+claim." The static amoeba advantage over `vanilla` comes from having a path at
+all, not from pseudopods.
+
+**3. Gazebo reproduced the sandbox exactly.** Live monitor on Gazebo world 48:
+ancillary paths non-empty in ~1% of ticks (37/4510). Sandbox world 48:
+`assist_fraction = 1.3%`. The C++ gate (`flow_assist_only_when_path_blocked`,
+`flow_path_blocked_ratio 0.07`, `flow_clear_confirm_cycles 3`) mirrors the
+sandbox `gate="auto"` + `path_validity_gate` (`max_path_occupancy_ratio 0.07`);
+in NORMAL mode `ancillary_mode_valid_.fill(false)` so TG-MPPI IS plain
+path-following MPPI ~99% of the time. "Both perform well on world 48" is what
+the sandbox predicts (path_mppi 4/5, path_biased 5/5, amoeba 5/5 there).
+
+**4. Where the mechanism actually shows up: a locally BLOCKED path with an
+open alternative.** `blocked_split` (junction_env.py: 1.55 m-half-width split
+around a 0.7 x 1.7 m island, scripted peer stops in the planned left branch):
+vanilla 0/5 (static collision), path 0/5 (peer collision), amoeba 5/5,
+`assist 98.3%`, `branch selection 49.9%`; attribution vs `flow_only` 9/10 vs
+2/10 (McNemar p=0.0156). Neither Gazebo test run today (static world 48; open
+room with crossing obstacles) reproduces that regime: the first never blocks
+the plan, the second has no static geometry to force a second homotopy class.
+World 7 -- the only static world where path_biased fails and amoeba succeeds
+-- is `footprint_collision` at 1:1 for the 0.84 x 0.68 footprint
+(slip_world_feasibility_0.84x0.68.csv: -0.028 m), so it cannot be used in
+Gazebo either.
+
+**5. CORRECTION of something I said in chat earlier today**: the frozen
+sandbox `amoeba` is built with `grouped_sampling=True, gate="auto",
+fallback_share=0.25, mode_min_dwell=10, mode_confirm_cycles=3,
+mode_switch_margin=0.3` (experiments/v7_benchmark.py:63-67). I had claimed the
+banked results used the same shared-softmax default as the Nav2 port
+(`tgmppi_grouped_update: false`) after reading only the mppi.py class default
+-- wrong. Config differences that matter ONLY in the ASSIST regime (none of
+them matter in static worlds where selection is 0% regardless):
+  - grouped update: sandbox V3 grouped ON vs Nav2 `tgmppi_grouped_update: false`
+  - bias_strength: sandbox 0.6 vs Nav2 yaml 0.2 (the port's own default is 0.6;
+    the yaml overrides it down)
+  - bias_gain: 0.6->1.5 sandbox vs 1.0 yaml
+  - mode hysteresis (dwell/confirm/margin): not ported (documented gap)
+  - fallback_share 0.25: no direct Nav2 equivalent (flow_wait_fraction 0.20 is
+    a different thing -- stationary rollouts, not the path fallback share)
+  - reference_min_speed_ratio 1.0 in the yaml == `amoeba_nominal_fb`, fine.
+
+**Bottom line for the report**: TG-MPPI is not "failing to transfer" -- in
+static corridors with a valid global plan it is designed to be plain
+path-following MPPI, and both the sandbox and Gazebo show exactly that. The
+thesis claim lives in the blocked-path regime, where the sandbox evidence is
+strong and Gazebo has not been tested. If a Gazebo demonstration of the
+mechanism is ever wanted, the experiment is a `blocked_split` analogue (island
+with two routes, obstacle placed on the planned branch AFTER planning), with
+the Nav2 params aligned to the frozen amoeba (grouped_update true,
+bias_strength 0.6) -- not more static-BARN or open-room runs. Declared
+optional; not required for green light or for November.
