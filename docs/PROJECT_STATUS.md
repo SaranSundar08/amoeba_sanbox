@@ -2033,3 +2033,47 @@ addition (decouples the static-clutter confound as intended, and gave the
 first live confirmation of the AMCL z_rand fix), but the real next step is
 investigating pseudopod-branch sustainment in low-clutter geometry, not
 tuning obstacle speed/count further.
+
+## 2026-09-14 (continued): vanilla-vs-tgmppi param parity audit -- a real, pre-existing gap found
+
+Prompted by Saran asking directly whether `navigation_tgmppi_tight.yaml` and
+`navigation_sim_tight.yaml` (vanilla) share common params. Checked directly
+rather than trusting the 2026-09-09 "matched" note:
+
+**Confirmed matching**: MPPI core (`time_steps`, `model_dt`, `batch_size`,
+`vx_std/vy_std/wz_std`, `vx_max/vx_min/vy_max/wz_max`, `temperature`,
+`gamma`, `motion_model`), every critic weight shared between the two
+controllers, costmap resolution/footprint size/obstacle_layer/STVL config.
+
+**Found and fixed, AMCL** (see previous entry -- alpha1-5, max_beams were
+already silently different pre-dating this session; z_hit/z_rand/
+update_min_a/d newly diverged from today's dynamic-obstacle fix, which had
+only been applied to the tgmppi yaml). Mirrored into `navigation_sim_
+tight.yaml`.
+
+**Found and fixed, costmap inflation** -- a second, separate, pre-existing
+gap with NO "matched to X" comment anywhere near it (unlike every other
+matched param, which had one) -- no evidence either way whether this was
+deliberate:
+```
+                        vanilla (before)   tgmppi        vanilla (now)
+inflation_radius        0.60               0.40          0.40
+cost_scaling_factor     10.0               6.0           6.0
+footprint_padding (local)  0.03            0.02          0.02
+```
+Matched vanilla to tgmppi's values, same direction as every other
+"matched to navigation_tgmppi_tight.yaml" comment in this file.
+
+**Important caveat, stated plainly**: this gap predates today -- it was not
+introduced by this session. Any PRIOR vanilla-vs-tgmppi comparison run on
+the tight-tier yaml pair (this includes any BARN benchmark results, not
+just today's open-world test) was generated with a real, undocumented
+confound in the obstacle-cost landscape both controllers' CostCritic reads
+from. Unknown whether this changes any banked conclusion -- depends how
+sensitive those results were to inflation margin, not evaluated here.
+Flagging honestly rather than assuming it doesn't matter; re-running the
+affected banked comparisons under matched inflation params (if they're
+still being cited) is the honest way to close this out, not assumed away.
+
+`navigation_sim.yaml`/`navigation_tgmppi.yaml` (the non-tight pair) were
+NOT audited this pass -- same open item as noted on 2026-09-09.
