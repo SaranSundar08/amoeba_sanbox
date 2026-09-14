@@ -1955,3 +1955,81 @@ localization holds without the manual-wiggle workaround, THEN actually
 exercise the space-time Phase 1 wiring live for the first time. None of
 today's SLIP-repo changes are committed yet -- still the user's to
 commit/push.
+
+## 2026-09-14: open-world dynamic testbed, and the real reason the collision doesn't discredit space-time topology
+
+Professor feedback (relayed by Saran): test space-time topology in an open
+world with dynamic obstacles instead of BARN, to decouple it from BARN's
+narrow-corridor static clutter. Sound call -- it also incidentally isolates
+yesterday's AMCL fix from the narrow-corridor confound.
+
+**Built**: `BARN_dataset/scaled_1/world_files/world_open_dynamic.world` (local-
+only, gitignored like all BARN_dataset content) -- an empty room (8m x 13m
+interior, thin boundary walls only, zero static clutter), plus a matching
+free-space map (`map_pgm_open_dynamic.pgm`/`yaml_open_dynamic.yaml`).
+Obstacles reuse the existing `liboscillating_obstacle_plugin.so`, oscillating
+ACROSS the robot's straight path (`center_x=0`, `axis=x`) so each one is
+guaranteed to sweep the path every period, not just opportunistically clip a
+clearance pocket the way the BARN version did. Generator script committed at
+`world_files/make_open_world.py` -- edit the `obstacles` list and rerun; it
+validates via `gz sdf -k` and prints both the peak-speed check
+(`amplitude*omega` vs `vx_max`) and the exact yaml block to paste into
+`tgmppi_spacetime_obstacle_topics`.
+
+**Two real parameter bugs caught before/during live testing, both mine**:
+1. First pass copied BARN's `omega` values without rechecking peak speed
+   against the much bigger `amplitude` needed to sweep a wider room -- one
+   obstacle ended up moving at 0.98 m/s, ~2.8x the robot's `vx_max=0.35`.
+   Recomputed to keep peak speeds in the same 0.13-0.34 m/s range proven
+   working in `world_48_dynamic.world`.
+2. Bumped `vx_max` 0.35->0.5 (per Saran's request, to also test a faster
+   robot) and re-added obstacles up to 5 total. Collided again. Reverted
+   `vx_max` to 0.35 as an isolation test (one variable at a time) -- still
+   collided, ruling out speed as the (sole) cause of this specific
+   collision.
+
+**Live diagnosis (real evidence, not another guess)**: wrote a throwaway
+rclpy monitor subscribing to the robot's `/ground_truth/odom`, all 5
+obstacles' `/moving_obstacle_N/ground_truth/odom`, `/amcl_pose`, and the
+`/tgmppi/ancillary_path_1..5` topics, logging robot-obstacle clearance and
+AMCL-vs-ground-truth drift in real time. Result for the actual collision
+(obstacle 2):
+```
+clearance:  0.034 -> 0.001 -> -0.028 -> -0.055 -> -0.052 -> -0.095  (real penetration)
+active_ancillary_modes:  [] [] [] [] [] []   <- zero, the entire approach
+```
+AMCL drift stayed under 5cm throughout this collision -- yesterday's
+`z_rand`/`z_hit` fix holds under real testing, first confirmation it works.
+`tgmppi_spacetime_enabled` and `tgmppi_bias_enabled` both confirmed `true`
+live on the node -- not a disabled-feature red herring.
+
+**The actual finding**: across the whole run, the 3 baseline pseudopod
+ancillary paths flicker on for 2-3 ticks at a time then collapse back to
+empty, and the 2 space-time alternative-mode slots (paths 4/5) **never
+appeared even once**, despite 5 real crossing obstacles present the whole
+time. The collision happened while NO branch mode -- baseline or
+space-time -- was active. Since `trySpacetimeAlternatives()` extends an
+existing pseudopod branch rather than creating one from scratch, if
+baseline branching itself doesn't sustain, space-time alternatives never
+get a branch to extend.
+
+**Conclusion, and why this collision does NOT mean "space-time topology
+doesn't work"**: it means space-time topology was never exercised in this
+run at all -- the mechanism one level below it (pseudopod branch formation)
+doesn't reliably sustain in an open, low-clutter room where a lone obstacle
+has plenty of clearance on both sides. This is a real, reportable boundary-
+condition finding in its own right (topology guidance needs geometry that
+forces a genuine, sustained bifurcation; an isolated obstacle in wide-open
+space may not reliably produce one), distinct from and more specific than
+"the feature failed." Root-causing WHY pseudopod extraction collapses here
+(flood/viscosity formation in low-clutter costmaps) is a real code dig,
+declared out of scope for today (presentation-prep day) per explicit user
+choice -- flagged as the next actual step whenever this resumes.
+
+**Honest end-of-day state**: space-time Phase 1 wiring remains completely
+unvalidated live -- not because it was tested and failed, but because it has
+still never fired even once. The open-world testbed itself is a good
+addition (decouples the static-clutter confound as intended, and gave the
+first live confirmation of the AMCL z_rand fix), but the real next step is
+investigating pseudopod-branch sustainment in low-clutter geometry, not
+tuning obstacle speed/count further.
