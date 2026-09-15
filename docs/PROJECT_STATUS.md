@@ -2327,3 +2327,28 @@ only ever ADDING error on top of perfect odometry.
   node on; sim=true+amcl -> True, node off; sim=false -> True, node off.
   AMCL still runs (lifecycle) but no longer localizes the robot; no RViz
   "2D Pose Estimate" needed. NOT yet verified live.
+
+**Ground-truth localizer, first live run failed -- my bug, fixed and tested.**
+Saran: "performing very very badly". Nav2 container log showed every
+FollowPath goal aborting immediately with `Exception in transformPose: Lookup
+would require extrapolation into the future. Requested time 132.453 but the
+latest data is at time 132.182 ... Unable to transform robot pose into global
+plan's frame` -> BT recoveries (wait / backup / spin 1.57) -> goal failed ->
+bt_navigator heartbeat lost -> lifecycle manager shut navigation down. The
+robot never navigated; it only ran recoveries.
+Causes (both in ground_truth_localizer.py): (1) map->odom stamped at
+ground-truth time + 0.1 s, but Nav2 looks it up at the NEWEST odom->base_link
+stamp (100 Hz), which ran ~0.27 s ahead of the lagging ground truth (sim RTF
+~0.55); AMCL never hit this because it post-dates by transform_tolerance
+1.0 s. (2) The GT callback blocked up to 50 ms in lookup_transform on the same
+executor that receives /tf (~540 Hz), so the TF buffer lagged/dropped -- also
+the cause of the ~90 s "odom does not exist" at startup.
+Fix: TransformListener(spin_thread=True); no blocking lookups; map->odom
+stamped at max(newest odom stamp, GT stamp) + future_dating (default 1.0 s,
+= AMCL transform_tolerance). Test mirroring Nav2 (fake Gazebo at RTF 0.55,
+odom+wheel TF 100 Hz as separate messages, GT ~30 Hz with 60 ms latency;
+consumer looks up map->odom at the newest odom stamp every 50 ms), steady
+10 s: fixed node 0/200 failures; control with future_dating 0.0 149/200
+failures with the identical ExtrapolationException text. Earlier offline
+checks (wall + sim time) had passed because they never did that lookup --
+lesson: test against the consumer's actual query. Needs a relaunch of Nav2.
