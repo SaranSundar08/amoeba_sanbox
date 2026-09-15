@@ -2475,3 +2475,32 @@ constant-velocity predictions are wrong at the oscillating obstacles' turn point
 (T-MPC Table VI: prediction mismatch dominates remaining collisions); any
 TG-MPPI-vs-stock gain in dynamic scenes includes prediction the baseline lacks.
 Next: live runs in open_dynamic with bags (TG-MPPI dynamic mode vs stock baseline).
+
+## 2026-09-16 00:10 -- dynamic run tgmppi_dyn_20260915_234156: no collisions, slow; three TG-MPPI-only fixes
+
+Bag analysis (ground truth, rosout, Nav2 log): both goals reached (leg 2 "Reached
+the goal!" at t=131.8 is in the Nav2 log; the bag's rosout missed it). Leg 1 61.2 s
+vs 28.6 s straight at 0.35 m/s, leg 2 56.8 s vs 34.3 s: ~55 s lost, all in five
+interaction episodes (t 10-18, 28-41, 44-56, 60-66, 89-106): reversing (cmd_vx down
+to -0.33), 180 deg heading swings, crawling; only 44-56 is a genuine wait (obs4 at its
+turn point x=1.29, 0.06 m/s, where the path crosses its lane; Nav2 "Failed to make
+progress" at 55.2). Min true clearance +0.35..+0.56 m beyond contact.
+Causes: (1) soft band reach 0.40+0.25+0.5 = 1.15 m per obstacle vs 2.0 m lane gap --
+no cost-free space between lanes, robot keeps the whole band as clearance;
+(2) straight-ahead dynamic cost ~240 (t=46) vs path critics of a few units;
+(3) TG-MPPI cycle 33-41 ms near obstacles vs 10-13 ms in free space, ~50 "missed
+20 Hz" warnings, all inside the episodes (CPU critic, every step);
+(4) BUG: grouped update selected groups with free energy -1.4e19 / -3.6e20 for one
+cycle each (FE >= group min cost, critics add >= 0 -> a corrupt row cost; source not
+yet found); (5) zero space-time mode switches -- avoidance came from the prediction
+critic alone, not topology.
+Changes (TG-MPPI only; stock baseline untouched): navigation_tgmppi_tight.yaml
+DynamicObstacleCritic soft_distance 0.5 -> 0.15, trajectory_point_step 1 -> 2,
+cull_distance 4.0 -> 3.3 ((0.35+0.34)*2.8 s + 0.65 + 0.21). optimizer.cpp grouped
+update: drop groups that are out of range or contain a non-finite / < -1e3 cost
+before selection, WARN (first 20) with key, rows, offending row, cost, cvx0/cwz0 and
+rollout end -- next run's log should locate the source.
+Builds: CUDA=OFF exit 0 / 0 warnings, CUDA=ON exit 0 / 0 warnings; installed = CUDA
+(guard string present in libtgmppi_controller.so). Not yet run live.
+Next: rerun the same two goals; compare leg times, min clearance, rate misses,
+reversing time; optional soft_distance sweep 0.5/0.25/0.15 as a thesis figure.
