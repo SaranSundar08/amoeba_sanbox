@@ -2573,3 +2573,29 @@ code now. New rule: after adding a guard to these packages, grep the built .so f
 its message before trusting a run.
 Not yet run live. Next: rerun both goals; robot should finish even with the
 underlying corruption present, and the first [TGMPPI diag] line names the stage.
+
+## 2026-09-16 01:45 -- open_dynamic world: 5 -> 10 obstacles, count now a CLI option
+
+make_open_world.py reworked (argparse): --lanes, --per-lane {1,2}, --y-start, --y-step,
+--amplitude, --cx-offset, --peak-min/--peak-max, --vx-max, --out. Default is now
+5 lanes x 2 = 10 obstacles. Two geometry rules are ENFORCED (refuses to write, exit 1),
+both from bag evidence rather than taste:
+  1. lane spacing >= 1.6 m = 2*(contact 0.65 + soft_distance 0.15). Tighter lanes leave
+     no cost-free corridor and the robot reverses/loops (bag _20260915_234156: ~55 s).
+     So density is added PER LANE, not by packing lanes.
+  2. |amplitude|*omega < vx_max (0.35) -- an obstacle faster than the robot is
+     undodgeable by construction (an earlier pass had one at 0.98 m/s).
+Also checks each lane lies inside the room (y in [-0.5, 12.5]) -- caught a 7-lane/1.7 m
+layout that put a lane at y=12.70, past the north wall, and would have spawned obstacles
+inside it.
+Pairs: the plugin has no phase input (x = cx + A*sin(omega*t)), so the right-hand
+obstacle of each pair uses a NEGATIVE amplitude = exact 180 deg phase shift; pairs sit at
+cx -1.6 / +1.6, sweeping x in [-2.9,-0.3] and [+0.3,+2.9]. Peak speeds ramp 0.130 ->
+0.300 m/s across the 10, all distinct omegas so they never stay in phase.
+Verified: world_open_dynamic.world has 10 models, 10 plugins, namespaces 1..10, XML
+parses; guards reject too-tight lanes, too-fast obstacles, out-of-room lanes and
+--per-lane 3. navigation_tgmppi_tight.yaml tgmppi_spacetime_obstacle_topics extended to
+10 entries; scan filter auto-discovers, map needs no regeneration (obstacles are not
+baked into it). No rebuild needed for the controller (world + yaml only).
+Caveat: the NaN fail-safe / isBadFloat fix is still NOT validated live -- the 10-obstacle
+run is its first test as well.
