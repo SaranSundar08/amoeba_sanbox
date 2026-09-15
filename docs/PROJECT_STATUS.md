@@ -2306,3 +2306,24 @@ goals, no blocker, front-lidar-only):**
 - Still no blocker -> assist 1/70 s -> stabilizers still not exercised.
   Pseudopods continuous below/alongside the island, 15 wz flips / 70 s,
   min clearance +0.06 m, no collision.
+
+**Vicon-like localization in sim (same day).** Saran confirmed the real trials
+localize with Vicon markers, not AMCL, so AMCL drift in Gazebo is a sim-only
+artifact that was also confounding the stabilizer tests. Found while setting
+this up: with Gazebo's diff_drive the simulated /odom equals the true world
+pose from spawn (odom == world), i.e. odometry never drifts in sim -- AMCL was
+only ever ADDING error on top of perfect odometry.
+- New `susag_nav2/scripts/ground_truth_localizer.py`: publishes map->odom from
+  /ground_truth/odom (p3d, base_link in world, no noise), post-dated 0.1 s like
+  AMCL's transform_tolerance; also /ground_truth_localization/pose. Transform
+  math verified offline (10k random poses, worst error 4e-15; spawn case gives
+  identity). Assumes world frame == map frame (true for BARN scaled_1,
+  junction and open worlds).
+- `navigation.launch.py`: new arg `localization` (default `ground_truth`).
+  Effective only with `sim:=true`: launches the localizer and rewrites AMCL
+  `tf_broadcast` to false via RewrittenYaml (one owner of map->odom; no yaml
+  edit, so the vanilla/TG-MPPI yaml parity is untouched). Verified by
+  performing the substitutions: sim=true+ground_truth -> tf_broadcast False +
+  node on; sim=true+amcl -> True, node off; sim=false -> True, node off.
+  AMCL still runs (lifecycle) but no longer localizes the robot; no RViz
+  "2D Pose Estimate" needed. NOT yet verified live.
