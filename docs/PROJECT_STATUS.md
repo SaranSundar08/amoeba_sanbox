@@ -2417,3 +2417,18 @@ issues, and the "laser scans jumping around" in RViz dropped drastically.
 Generator committed as susag_nav2/scripts/make_fine_barn_maps.py (tracked;
 BARN_dataset/ is gitignored, so any new checkout must run it once); verified
 it reproduces map_files_fine byte-for-byte.
+
+**Open-room dynamic run 22:13 (not recorded).** Saran: moving obstacles "update
+slowly" and the robot collided with one on the return trip. From logs: RTF
+0.98 (sim not slow); goal 1 reached physically then preempted, goal 2 "Goal
+succeeded" (Nav2 does not detect collisions); ZERO TG-MPPI mode switches, so
+space-time modes never took control; one "Optimizer fail to compute path" at
+start (likely the spawn-drop costmap marks). Visible lag = local costmap
+publish 2 Hz / global 1 Hz (an obstacle at 0.3 m/s jumps 15-30 cm per RViz
+frame). Collision contributors (unverified without a bag): MPPI costs a frozen
+costmap snapshot over its 2.8 s horizon (reacts to where obstacles are, not
+where they go -- only space-time modes predict, and they never engaged), and
+front-only lidar leaves sides/rear unsensed and uncleared. Change, both tight
+yamls: local costmap update_frequency 5 -> 10 Hz, publish_frequency 2 -> 10 Hz
+(global costmap unchanged at 1 Hz). Next: record a dynamic run with the
+obstacle ground-truth topics.
