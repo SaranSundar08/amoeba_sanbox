@@ -2504,3 +2504,21 @@ Builds: CUDA=OFF exit 0 / 0 warnings, CUDA=ON exit 0 / 0 warnings; installed = C
 (guard string present in libtgmppi_controller.so). Not yet run live.
 Next: rerun the same two goals; compare leg times, min clearance, rate misses,
 reversing time; optional soft_distance sweep 0.5/0.25/0.15 as a thesis figure.
+
+## 2026-09-16 00:30 -- rerun tgmppi_dyn_20260916_001024 after soft band fix; pseudopod speed trap fixed
+
+Result of soft_distance 0.15 / point_step 2 / cull 3.3 / FE guard: leg 1 46.3 s (was
+61.2; straight 30.4), leg 2 39.5 s (was 56.8; straight 33.9). No reversing, no
+stops while navigating, leg 1 driven 10.66 m vs 10.64 m straight line. Min true
+clearance +0.06 m (obs3, t=30.8, overtaking the rear disc while the robot crawled
+across its lane). 47 missed-20Hz warnings, cycle mean 17.9 ms / max 41.6 ms.
+Guard fired once (t=6.0, first cycle after optimizer reset, row 0, cost -2.15e9,
+rollout sane -> a cost term; all 3 corrupt events so far right after a new goal).
+Remaining slowness = committed pseudopod mode 0: mean speed 0.15 / 0.22 m/s vs
+fallback 0.32-0.36. Cause: pod reference cruise = max(0.18, |current nominal vx|)
+blended 0.7 with the mode's own previous mean (warm start) -> once slowed, the mode
+keeps referencing its own low speed.
+Changes (TG-MPPI only): new setting tgmppi_pod_cruise_speed (default 0.18 = old
+hard-coded floor, BARN behaviour unchanged), yaml 0.35; DynamicObstacleCritic
+trajectory_point_step 2 -> 3. Builds: CUDA=OFF exit 0 / 0 warnings, CUDA=ON exit 0 /
+0 warnings; installed = CUDA (parameter string present). Not yet run live.
