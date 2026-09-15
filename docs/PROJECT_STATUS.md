@@ -2410,3 +2410,10 @@ Changes (both tight yamls kept in parity):
 Also noted, not fixed: the stabilizer hysteresis can hold the WAIT group
 (standstill) for ~0.65 s at goal start ("mode switch -2 -> -1") -- exempting
 wait from dwell is a small follow-up if Saran wants it.
+
+**Live confirmation (Saran, same evening):** with map_files_fine + inflation
+0.40 + no-spin BT, BOTH vanilla MPPI and TG-MPPI navigate world 48 without
+issues, and the "laser scans jumping around" in RViz dropped drastically.
+Generator committed as susag_nav2/scripts/make_fine_barn_maps.py (tracked;
+BARN_dataset/ is gitignored, so any new checkout must run it once); verified
+it reproduces map_files_fine byte-for-byte.
