@@ -2548,3 +2548,28 @@ prior, control-cost term; plus a quarantine count every 100 cycles.
 Builds: CUDA=OFF exit 0 / 0 warnings, CUDA=ON exit 0 / 0 warnings; installed = CUDA.
 Next: rerun the same two goals; the robot should finish both even with the bug
 present, and the first "[TGMPPI diag]" line names the stage that corrupts a row.
+
+## 2026-09-16 01:20 -- ROOT CAUSE of the silent corruption: -ffast-math kills every NaN guard
+
+Measured with the package's own flags (scratchpad/fm_test2.cpp): on a RUNTIME NaN,
+std::isfinite -> 1, std::isnan -> 0, (x != x) -> false. Only an integer test on the
+IEEE-754 exponent works. GCC removes the guarded branch entirely: the fail-safe
+added at 00:38 was missing from optimizer.cpp.o (00:42) while other strings from the
+same edit were present. Flags come from nav2_tgmppi_controller/CMakeLists.txt:83,
+inherited verbatim from stock nav2_mppi_controller/CMakeLists.txt:68 -- upstream
+Nav2, not ours. FlowField already knew (kWetLimit sentinel, flow_field.cpp:33).
+Consequence: the NaN control sequence that froze the robot for 606 cycles could not
+be detected by any check in the controller, including the new quarantine's
+isfinite() tests (its range tests survived, which is why it still compiled).
+Fix (TG-MPPI only): tgmppi::utils::isBadFloat() in tools/utils.hpp -- memcpy to
+uint32 and test (bits & 0x7F800000) == 0x7F800000; all 13 guard sites in
+optimizer.cpp and critic_manager.cpp routed through it. -ffast-math deliberately
+KEPT: the stock baseline compiles with it too, so removing it from TG-MPPI alone
+would bias the comparison.
+Verification: CUDA=OFF exit 0 / 0 warnings, CUDA=ON exit 0 / 0 warnings; installed =
+CUDA; `strings libtgmppi_controller.so` now contains the fail-safe message and all 7
+"[TGMPPI diag]" strings (before: 6, fail-safe absent) -- i.e. the guards are real
+code now. New rule: after adding a guard to these packages, grep the built .so for
+its message before trusting a run.
+Not yet run live. Next: rerun both goals; robot should finish even with the
+underlying corruption present, and the first [TGMPPI diag] line names the stage.
