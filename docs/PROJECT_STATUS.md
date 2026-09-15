@@ -2152,3 +2152,51 @@ with two routes, obstacle placed on the planned branch AFTER planning), with
 the Nav2 params aligned to the frozen amoeba (grouped_update true,
 bias_strength 0.6) -- not more static-BARN or open-room runs. Declared
 optional; not required for green light or for November.
+
+## 2026-09-15: why pseudopods are (almost) never generated in the Nav2 port -- root cause found, one-line fix
+
+Saran: "pseudopods are constantly generated in the sandbox but I never see
+them in Nav2" and "I want them constantly generated and assisting, without
+oscillation -- why does the port behave weirdly?" Two different causes.
+
+**Visualization/extraction (root cause, fixed):** `publishAncillaryPaths()`
+publishes `flow_field_.pseudopods()` on every reflood regardless of the
+ASSIST gate, so the ~1% non-empty rate measured yesterday means the flood
+itself extracted nothing 99% of the time. `flow_field.cpp` treats the END of
+the plan it is given as the goal; `goal_inside` (plan end inside the body and
+>3 cells from the window edge) short-circuits to a goal-seeded flood with
+NO membrane and NO pseudopods. The controller hands the flood the
+`transformed_global_plan`, which `PathHandler` prunes to `prune_distance`
+= 1.5 m (nav2 default, unset in our yamls) ahead of the robot. Body radius
+is 2.5 m, so the plan stub ALWAYS ends inside the body -> goal_inside ->
+zero pods, except when the stub is blocked (`body_[goal]` false) -- which is
+exactly when ASSIST fires, hence pods appeared only in those ~1% of ticks.
+The sandbox's `LocalFlowField` gets the full A* path + `path_rem`, so its
+"goal" is the real goal, outside the window, and `extract_pseudopods` runs
+on a real membrane ~74% of the run (`ancillary_available_fraction`).
+Fix: `prune_distance: 10.0` in BOTH tight yamls (parity) -- path_handler
+already stops at the local-costmap boundary, so this means "plan up to the
+window edge", which is what the sandbox sees. Dynamic param (live-settable).
+No control-behaviour change in NORMAL (`ancillary_mode_valid_.fill(false)`
+still applies); ASSIST now has real pods to offer instead of none.
+NOT YET VERIFIED LIVE (stack was down) -- next launch of world 48 should
+show ancillary_path_1..3 populated most of the run. PathAlignCritic (CPU)
+sees more plan points; small cost, worth a glance at cycle time.
+
+**"Always assisting without oscillation" (not fixed, by choice):** the
+frozen thesis `amoeba` does NOT constantly assist either -- `gate="auto"`
+(assist only when the plan is blocked/stalled; `assist_fraction` ~0 in all
+static worlds). What Saran sees "constantly" in the sandbox is the
+visualization of extracted pods, now reproduced in Nav2 by the fix above.
+Turning assistance always-on in the port (`flow_assist_only_when_path_
+blocked: false`) oscillates because the port has the PROPOSAL half of the
+sandbox but none of its stabilizers: no bias-direction EMA (`bias_smooth`
+0.35), no heading deadband (0.08 rad), no rate-limited `active` ramp
+(`gate_rate` 0.2), no `BranchTracker` (stable pseudopod identity across
+refloods), no mode-selection hysteresis (`mode_min_dwell` 10,
+`mode_confirm_cycles` 3, `mode_switch_margin` 0.3), and `grouped_update`
+off by default (shared softmax blends branches instead of committing).
+The yaml already compensates (`bias_gain` 1.5->1.0 "1.5 oscillated
+left/right", `bias_strength` 0.6->0.2, gate = blocked-only). Porting the
+stabilizers is ~1 focused day + live validation; declared NOT worth doing
+before the report/green light since the thesis config is gate="auto".
