@@ -2432,3 +2432,46 @@ front-only lidar leaves sides/rear unsensed and uncleared. Change, both tight
 yamls: local costmap update_frequency 5 -> 10 Hz, publish_frequency 2 -> 10 Hz
 (global costmap unchanged at 1 Hz). Next: record a dynamic run with the
 obstacle ground-truth topics.
+
+## 2026-09-15 (late): predicted-obstacle critic for TG-MPPI (T-MPC Eq. 2d inside MPPI) -- built, not yet run live
+
+Why (analysis vs de Groot et al., T-MPC): Nav2 CostCritic scores all 56 rollout
+steps against ONE costmap snapshot (cost_critic.cpp), i.e. assumes moving
+obstacles stand still for 2.8 s; predicted obstacle states were used only in the
+space-time search, which itself only runs in ASSIST (gated on path blocked, rare:
+0 mode switches in the 22:13 open-room run), and even its wait/detour modes were
+scored by the frozen critic (inverting the pass-behind decision). Open-room
+numbers: ignored obstacle displacement 0.36-0.95 m (0.9-2.4x inflation); warning
+time once a side-arriving obstacle's current mark overlaps the corridor 1.2-3.1 s
+< 3.5-3.8 s needed to clear its sweep -> structurally unavoidable for any
+frozen-snapshot MPPI (vanilla included).
+
+Implemented (TG-MPPI ONLY -- Saran: the baseline is stock Nav2 vanilla, never
+modified; a vanilla twin I had written was reverted before being built, see
+memory baseline-stock-nav2):
+- tools/dynamic_obstacle_cost.hpp (header-only, ROS-free): rollout point j vs each
+  tracked obstacle at t_j=(j+1)*model_dt, constant velocity; robot = 2 discs at
+  +-0.21 m, r=0.40 m; soft band 0.5 m (critical_cost*q^2), contact -> collision_cost
+  1e6 + 1e4 per metre penetration (grades the least-bad escape; fail_flag NOT set).
+- critics/DynamicObstacleCritic (CPU, works under both backends), CriticData
+  .tracked_obstacles, registered in critics.xml/CMake/yaml (cost_weight 3.81 =
+  CostCritic scale). Inert without received obstacles (static BARN).
+- Optimizer: obstacle subscriptions whenever topics are configured; per-topic
+  received flags + one snapshot per cycle in prepare(), shared by the critic and
+  trySpacetimeAlternatives. Fixes a latent bug: resize() left obstacle entries
+  uninitialised, so the space-time search could read garbage before first messages.
+- Unit test (scratchpad, exact header): straight run into obstacle 5's crossing
+  -> collides with prediction, NOT with a frozen snapshot; waiting -> safe; far
+  obstacle -> 0. All assertions pass (first version had a test-geometry error --
+  "waiting" at the origin was genuinely within contact distance -- corrected).
+- susag_nav2/scripts/tracked_obstacle_scan_filter.py + navigation.launch.py
+  `dynamic_obstacles:=true` (sim, TG-MPPI params only; ignored for the stock
+  baseline): drops lidar returns on /moving_obstacle_* obstacles
+  (/front_scan_filtered), removes STVL layers, sets
+  flow_assist_only_when_path_blocked false. Verified transform on both yamls.
+- Builds: CUDA=OFF 0 warnings, CUDA=ON 0 warnings; installed = CUDA with the critic.
+Caveats: sim only (needs obstacle states; no tracker on the real robot);
+constant-velocity predictions are wrong at the oscillating obstacles' turn points
+(T-MPC Table VI: prediction mismatch dominates remaining collisions); any
+TG-MPPI-vs-stock gain in dynamic scenes includes prediction the baseline lacks.
+Next: live runs in open_dynamic with bags (TG-MPPI dynamic mode vs stock baseline).
