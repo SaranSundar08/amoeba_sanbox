@@ -2352,3 +2352,19 @@ consumer looks up map->odom at the newest odom stamp every 50 ms), steady
 failures with the identical ExtrapolationException text. Earlier offline
 checks (wall + sim time) had passed because they never did that lookup --
 lesson: test against the consumer's actual query. Needs a relaunch of Nav2.
+
+**Localizer, second live failure (my previous fix caused it), fixed.** After
+the extrapolation fix, RViz showed nothing again: localizer log had only its
+startup line (no 10 s status), `map` absent, all 31 process threads idle on
+futex waits. Cause: in Humble, `TransformListener(buffer, node,
+spin_thread=True)` adds THAT node to its own SingleThreadedExecutor
+(tf2_ros/transform_listener.py:103-115), while `rclpy.spin(node)` adds it to
+the global executor; rclpy's Node.executor setter moves a node between
+executors, so the two stalled each other. My offline test had passed by race
+luck. Fix: dedicated helper node `ground_truth_localizer_tf` (same
+use_sim_time) owns the TransformListener thread; the main node only handles
+ground truth + the status timer. Verified 3 x the 16 s Nav2-style test
+(200/200 ok each) and a 40 s run: 800/800 ok, node alive, status lines every
+~18 s wall at RTF 0.55 with 332-333 ground-truth msgs and the same number of
+map->odom publishes per 10 s sim. Needs a Nav2 relaunch (the stalled process
+is still in the user's current session).
