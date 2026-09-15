@@ -2522,3 +2522,29 @@ Changes (TG-MPPI only): new setting tgmppi_pod_cruise_speed (default 0.18 = old
 hard-coded floor, BARN behaviour unchanged), yaml 0.35; DynamicObstacleCritic
 trajectory_point_step 2 -> 3. Builds: CUDA=OFF exit 0 / 0 warnings, CUDA=ON exit 0 /
 0 warnings; installed = CUDA (parameter string present). Not yet run live.
+
+## 2026-09-16 00:55 -- bag tgmppi_dyn_20260916_002534: robot frozen after goal 2 = NaN commands; quarantine + diagnostics
+
+Symptom: goal 1 reached (40.9 s), then at goal 2 (t=46.14, right after "Optimizer
+reset") every command is NaN/Inf -- velocity_smoother "Velocity message contains
+NaNs or Infs! Ignoring as invalid!" x606 until shutdown, robot stationary. Self-
+sustaining: NaN control sequence -> NaN cvx for all rows -> NaN costs -> NaN control.
+Leg 1 already logged 20 corrupt-cost groups (~-5e24, always a whole pseudopod block,
+sane cvx0 and sane rollout endpoints) and hit the log cap by t=20.8 s. The cruise
+change did not create this -- it made pseudopod blocks the dominant sampling mode.
+Analysis: no critic can add negative cost; pod references are clamped (v <= vx_max,
+w <= wz); noise is bounded; control_sequence_ is clipped before smoothing. So the
+only terms that can go to -1e24 are the control cost (sum u*(cvx-u)) or the rejoin
+prior -- source not yet proven, hence instrumentation rather than a guess.
+Changes (TG-MPPI only): (1) row quarantine in updateControlSequence -- a row with a
+non-finite/implausible cost or non-finite sampled controls gets worst_sane+1e4 and
+the nominal controls, so it can never win a group nor NaN a weighted mean; replaces
+the group-level drop (group guard now only checks row ranges). (2) fail-safe in
+evalControl: non-finite control sequence or smoother history -> reset to rest,
+mode_nominals_ cleared, logs whether the NaN predates smoothing. (3) capped
+first-offender diagnostics in execution order: sampled controls after bias (with pod
+slot + assist flag), rollouts, first critic to corrupt a row (critic_manager), rejoin
+prior, control-cost term; plus a quarantine count every 100 cycles.
+Builds: CUDA=OFF exit 0 / 0 warnings, CUDA=ON exit 0 / 0 warnings; installed = CUDA.
+Next: rerun the same two goals; the robot should finish both even with the bug
+present, and the first "[TGMPPI diag]" line names the stage that corrupts a row.
