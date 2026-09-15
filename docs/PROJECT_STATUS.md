@@ -2368,3 +2368,45 @@ ground truth + the status timer. Verified 3 x the 16 s Nav2-style test
 ~18 s wall at RTF 0.55 with 332-333 ground-truth msgs and the same number of
 map->odom publishes per 10 s sim. Needs a Nav2 relaunch (the stalled process
 is still in the user's current session).
+
+## 2026-09-15 (evening): world 48 "local minimum" = global planner failures, not the controller -- fine maps, inflation 0.40, no spin recovery
+
+Saran: robot "stuck in a local minimum" in BARN world 48, "didn't happen
+yesterday". Evidence:
+- Every run (TG-MPPI at inflation 0.40 and 0.35, and VANILLA MPPI) failed the
+  same way ~12-14 s in: `GridBased: failed to create plan` -> spin / wait /
+  backup -> goal failed. Controller-independent.
+- Sept 14 logs show the same thing on world 48 (5 of 8 sessions had planner
+  failures: 4, 14, 11, 1, 1) -- not a regression from today's changes.
+- Bag barn48_20260915_180239: global costmap snapshots checked for
+  connectivity. Static walls alone always connect start->goal; lidar-marked
+  cells NOT in the static map (19 -> 68) land in the free cell next to obstacle
+  faces and, from t~18 s, disconnect the costmap (planner failed t=17.0).
+  The global costmap runs at the MAP resolution (0.15 m; the yaml
+  `resolution: 0.025` is overridden by the static layer), so one mark widens
+  an obstacle by 15 cm; world 48's bottleneck has 7.3 cm footprint margin at
+  (-3.14, 5.69) (slip_world_feasibility_0.84x0.68.csv) -- exactly where it
+  stuck.
+- The collision in that bag was Nav2's SPIN recovery (vx 0, wz +1.0) rotating
+  the 0.84 x 0.68 m rectangle into an obstacle at bearing +45 deg, t=22.7 s,
+  -0.088 m worst; the obstacle was lethal in the local costmap and inside the
+  front lidar FOV. Not the controller.
+- A costmap-drops hypothesis for "yesterday" was checked and rejected (0 drop
+  logs in all bags).
+Changes (both tight yamls kept in parity):
+1. `map_files_fine/`: all 300 BARN maps resampled 0.15 -> 0.05 m (3x3 per
+   cell; exact because BARN obstacles are 0.15 m grid-aligned; every map
+   round-trip verified), junction + open maps copied; `map_files/` untouched;
+   navigation.launch.py BARN_MAPS_DIR -> map_files_fine. Verified on world 48
+   (0.37 m inscribed inflation): coarse map + one stray cell on every obstacle
+   face -> NO ROUTE; fine map + the same worst case -> ROUTE EXISTS.
+2. navigation_tgmppi_tight.yaml inflation 0.35 -> 0.40 (Saran had set 0.35 at
+   17:53; below the 0.36/0.37 m inscribed radius, Nav2 logged it as invalid;
+   vanilla yaml is 0.40).
+3. `susag_nav2/behavior_trees/navigate_to_pose_w_replanning_no_spin.xml` =
+   Nav2 Humble default tree minus `<Spin>` (diff verified: only that line);
+   `default_nav_to_pose_bt_xml` set in both tight yamls. Per-goal
+   behavior_tree (e.g. plan-once for junction tests) still overrides it.
+Also noted, not fixed: the stabilizer hysteresis can hold the WAIT group
+(standstill) for ~0.65 s at goal start ("mode switch -2 -> -1") -- exempting
+wait from dwell is a small follow-up if Saran wants it.
