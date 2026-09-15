@@ -2284,3 +2284,25 @@ from header stamps; that it causes the missed goal check is the most likely
 explanation, NOT yet verified -- the next run with sim:=true confirms or
 refutes it. Scope of impact: Nav2's success/abort status (and possibly AMCL
 and loop timing), not whether the robot reaches places.
+
+**Rerun with sim:=true (bag junction_manual_20260915_170053, 70 s, 3 manual
+goals, no blocker, front-lidar-only):**
+- **Clock fix CONFIRMED.** All Nav2 + Gazebo stamps now sim time (/plan,
+  local costmap, TF, scans). Nav2 logged "Reached the goal!" for both goals
+  where the robot settled (t=23.0, t=67.1; goal 2 was preempted while still
+  arriving). The goal-check failure from the previous bag is gone.
+- Saran lowered diff_drive `<update_rate>` 1000 -> 100 himself (16:55):
+  /odom 100 Hz, /tf ~540 Hz; control-loop rate warning only once at start;
+  TG-MPPI cycle mean 8.39 -> 7.49 ms.
+- **New: AMCL with the front lidar only drifts 0.3-0.57 m** in this
+  symmetric corridor (peak 0.57 m while turning near the start, 0.3-0.4 m
+  for t=27-51 s; merged-scan run was 0.1-0.36 m). Consequence: goal 3
+  "reached" with the robot truly 0.35 m short (gt (0.97, 6.54) vs goal
+  (0.98, 6.89)). The two NavFn "failed to create plan" events (t=48.7,
+  53.5) coincide with the 0.40-0.57 m error window -- likely a mis-localized
+  start pose inside inflation, not verified. Very low AMCL motion noise
+  (alpha 0.05-0.08) makes it trust odometry and correct slowly. Only matters
+  for trials if trials localize with AMCL (plan was Vicon mocap).
+- Still no blocker -> assist 1/70 s -> stabilizers still not exercised.
+  Pseudopods continuous below/alongside the island, 15 wz flips / 70 s,
+  min clearance +0.06 m, no collision.
