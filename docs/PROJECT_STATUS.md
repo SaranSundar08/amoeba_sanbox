@@ -2599,3 +2599,38 @@ parses; guards reject too-tight lanes, too-fast obstacles, out-of-room lanes and
 baked into it). No rebuild needed for the controller (world + yaml only).
 Caveat: the NaN fail-safe / isBadFloat fix is still NOT validated live -- the 10-obstacle
 run is its first test as well.
+
+## 2026-09-16 02:10 -- why space-time never fires: gate analysis, instrumentation, relevance 0.35
+
+Measured fact from bags _20260915_234156 and _20260916_001024: zero space-time mode
+SELECTIONS (mode-switch keys >= kSpacetimeKeyBase). What was never measured: whether a
+space-time route was ever CREATED and simply lost the free-energy selection. That
+distinction is why this round adds counters instead of another guess.
+Gate analysis (trySpacetimeAlternatives, optimizer.cpp):
+  - tgmppi_spacetime_relevance was 0.0, and the test is
+    `if (worst_margin > relevance) continue;` where margin = dist(centreline point,
+    predicted obstacle) - (obstacle radius 0.25 + robot inscribed radius). At 0.0 a
+    crossing required an ACTUAL predicted overlap of the pseudopod centreline with the
+    obstacle disc; near-misses did not count at all.
+  - Detection reach is only search_speed * horizon = (res/dt_layer) * horizon =
+    (0.10/0.30) * 6.0 = 2.0 m of pseudopod arc. Obstacles further ahead are invisible to
+    the trigger, and within 2 m the DynamicObstacleCritic has usually already slowed/
+    steered, so the pod no longer points at the obstacle.
+  - Further narrowing: only the single worst obstacle is fed to the search, local goal is
+    1.8 m along the pod, it stops at the FIRST triggering pseudopod, max 2 extra modes.
+Changes (TG-MPPI only): relevance 0.0 -> 0.35 m; stage counters logged every 100 cycles
+("[TGMPPI spacetime] ... crossing detected N (best margin X vs relevance Y), searches
+feasible N, modes appended N, non-distinct N, search Z ms"); and a real bug fixed --
+twoRouteSearch's `distinct` flag (do the two routes pass the obstacle on OPPOSITE sides,
+the whole wait-behind vs go-before point) was computed and then ignored, so two identical
+routes could be appended and burn both extra mode slots. Now both only when distinct,
+else the cheaper one.
+Deliberately NOT changed yet: tgmppi_spacetime_horizon (6.0). Raising it to 9 s would give
+3.0 m reach but grows the A* state space (21 -> 31 time layers) and that search uses
+std::map/std::set -- decide after the logged search ms. res/dt_layer must stay ~vx_max
+(0.333 vs 0.35), or the search assumes a robot faster than this one.
+Next log decides the fix: detected 0 -> reach/threshold; detected but feasible 0 -> window/
+goal tolerance; appended but no switches -> selection (promise inheritance / sample budget).
+Caveat: even when it fires, only the first 2.8 s of the route is used (time_steps*model_dt).
+Builds: CUDA=OFF exit 0 / 0 warnings, CUDA=ON exit 0 / 0 warnings; installed = CUDA, log
+string verified present in libtgmppi_controller.so. Not yet run live.
