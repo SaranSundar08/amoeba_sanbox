@@ -2200,3 +2200,74 @@ The yaml already compensates (`bias_gain` 1.5->1.0 "1.5 oscillated
 left/right", `bias_strength` 0.6->0.2, gate = blocked-only). Porting the
 stabilizers is ~1 focused day + live validation; declared NOT worth doing
 before the report/green light since the thesis config is gate="auto".
+
+## 2026-09-15 (afternoon): stabilizer port built; first bag exposed a sim-clock bug that invalidates this week's Gazebo goal outcomes
+
+**Stabilizer port (SLIP repo, nav2_tgmppi_controller, not yet committed --
+user pushes):** BranchTracker slots (`tgmppi_pod_tracking`,
+`tgmppi_pod_match_distance`), keyed groups + `_select_committed_mode`
+hysteresis (`tgmppi_mode_min_dwell` / `_confirm_cycles` / `_switch_margin`),
+per-mode warm start (`tgmppi_mode_warm_start`, sandbox mode_nominals),
+assist ramp (`tgmppi_assist_ramp_rate`, gate_rate), heading deadband
+(`tgmppi_bias_deadband`). Every plugin default reproduces pre-port behaviour;
+navigation_tgmppi_tight.yaml enables them with the frozen sandbox values and
+sets `tgmppi_grouped_update: true` (the frozen amoeba is grouped). Caught a
+key-collision bug in my own diff before it ran (space-time extras keyed by
+array index could share a pseudopod key when tracking is off). Both
+configs build clean, 0 warnings. `[TGMPPI] mode switch` logs at INFO.
+`tgmppi_mode_switch_margin: 0.3` is in SANDBOX cost units -- uncalibrated.
+Note: yaml `tgmppi_bias_strength 0.2` gives branches 20% of the batch vs
+the sandbox's 75% (fallback_share 0.25) -- deliberately not changed yet.
+
+**Test world:** `world_idx:=junction_split` (make_junction_world.py) --
+Gazebo analogue of junction_env.py blocked_split, island shifted +0.10 m so
+NavFn plans left; run_junction_test.py automates reset/goal/blocker/bag.
+IMPORTANT regime note: Nav2's default BT replans at 1 Hz, so a static
+blocker is simply routed around by NavFn and TG-MPPI never needs ASSIST --
+the sandbox's stale-path regime needs the plan-once BT
+(`navigate_w_replanning_only_if_goal_is_updated.xml`, selectable per goal
+via NavigateToPose.behavior_tree). This is also part of the honest answer to
+"why doesn't TG-MPPI beat Nav2 MPPI": Nav2's stack replans; the sandbox
+baselines did not.
+
+**Bag junction_manual_20260915_164429 (115 s, 4 manual goals, no blocker):**
+- pseudopods present continuously below/alongside the island (prune_distance
+  fix confirmed live); slots stable; 24 wz flips / 115 s, max 1 per second
+  (no oscillation); min clearance +0.06 m (0.42 m circle); assist 2 s only
+  -> stabilizers not exercised yet.
+- **SIM-CLOCK BUG (root cause, mine):** Gazebo-side data (/odom, /tf, scans,
+  ground truth) stamped in SIM time (~149 s) while /plan and
+  /local_costmap/costmap are stamped in WALL time (~1.789e9 s). Nav2 was
+  launched without `sim:=true` (navigation.launch.py default 'false'); the
+  Sept 9 documented command had it, the commands I gave this week dropped
+  it. Effect: controller_server's goal check transforms the wall-stamped
+  goal through a sim-stamped TF buffer, fails silently, and the goal is NEVER
+  reached -- no "Reached the goal" in any of 4 goals; goal 4 aborted twice
+  with "Failed to make progress" while AMCL had the robot 0.02 m / 0 deg from
+  the goal for >10 s. Likely also contributes to AMCL error (0.1-0.36 m vs
+  <5 cm this morning) and "control loop missed its desired rate". Affects
+  every Gazebo run this week (vanilla and TG-MPPI alike) -- treat their goal
+  success/failure as invalid. Fix: `ros2 launch susag_nav2
+  navigation.launch.py sim:=true ...`. No code change.
+- **Merged scan is accurate** (stationary window, vs known geometry: front
+  median 1.2 cm, rear 0.9 cm, merged 1.4 cm, max 9 cm). An earlier claim in
+  chat that the merger was misregistered was an artifact of my own analysis
+  (scans matched to ground-truth poses during motion) -- retracted.
+- **/odom ~1000 Hz, /tf ~5000 Hz:** diff_drive `<update_rate>1000` +
+  publish_wheel_tf/publish_odom_tf in susag_updated_model.gazebo:71. CPU hog;
+  NOT changed (it is a sim-condition change for all prior runs -- user's call).
+- **Middleware:** ~/.zshrc sets rmw_cyclonedds_cpp, ~/.bashrc does not;
+  mixed terminals -> topics cross, services don't. On Wi-Fi only, Cyclone
+  multicast discovery failed (no map). Added ~/.config/cyclonedds/local_sim.xml
+  (loopback peer, no multicast; verified topic + service across processes);
+  ~/.config/cyclonedds/cyclonedds.xml (peer 172.16.76.118) is the lab config,
+  untouched.
+
+**Sensor config now matches the trials (front lidar only):** AMCL
+`scan_topic: front_scan` and both costmaps' obstacle layers
+`observation_sources: front_scan`, in BOTH tight yamls (parity);
+gazebo_barn.launch.py `merge` default -> false.
+
+Next: relaunch with sim:=true (+ consistent RMW), rerun the junction test
+(plan-once BT + blocker) -- that is the first run that can actually judge the
+stabilizers.
