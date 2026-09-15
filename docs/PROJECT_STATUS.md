@@ -2271,3 +2271,16 @@ gazebo_barn.launch.py `merge` default -> false.
 Next: relaunch with sim:=true (+ consistent RMW), rerun the junction test
 (plan-once BT + blocker) -- that is the first run that can actually judge the
 stabilizers.
+
+**Correction to the entry above (same day, after Saran pointed out the robot
+visibly reached every goal):** the robot DID physically drive to all 4 goal
+poses; driving behaviour in this week's Gazebo runs is valid. What the bag
+shows is narrower: Nav2 never logged "Reached the goal". Goals 1-3 were
+preempted by the next RViz goal 1-3 s after the robot arrived, so they are
+inconclusive. Goal 4 is the clean case: AMCL 0.02 m / 0 deg from the goal
+for >10 s, Nav2 aborted twice with "Failed to make progress" while the robot
+made small corrections in place. The sim/wall clock mismatch is confirmed
+from header stamps; that it causes the missed goal check is the most likely
+explanation, NOT yet verified -- the next run with sim:=true confirms or
+refutes it. Scope of impact: Nav2's success/abort status (and possibly AMCL
+and loop timing), not whether the robot reaches places.
