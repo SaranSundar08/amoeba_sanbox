@@ -2687,3 +2687,40 @@ rebuilt, so the 24.0 value never reached a simulation. The file now carries 4.0 
 units documented in place so the mistake is not repeated.
 Everything else from the speed round stands: the max_speed:= launch option and its cascade
 were verified by executing speed_params() against both yamls.
+
+## 2026-09-16 15:40 run (log 36452, no bag): space-time now fires -- and was making things worse
+
+First run at max_speed:=1.5 with the 10-obstacle world. User reports occasional collisions.
+Evidence (Nav2 log only; no bag recorded):
+  - Space-time GATE now opens: crossing detected 91/76/100 per 100 cycles, searches feasible
+    91/76/98, best margin -0.39/-0.50/-0.56 m (negative = predicted overlap of the pod
+    centreline). Selected twice ("mode switch -1 -> 1003"). The relevance 0.35 + reach 4.5 m
+    change worked.
+  - BUT non-distinct 91/91, 76/76, 96/102: the wait and detour searches return the SAME
+    homotopy class every time, so no pass-before vs pass-behind choice is being offered.
+    Both searches differ only in wait cost; with one obstacle and a 4.5 m local goal they
+    converge. Genuine classes need a homotopy constraint (forbid route A's passing side in
+    search B) -- that is T-MPC's guidance planner, real work, not a parameter.
+  - BUG (mine): 10 logged rows at pod slot 3 with cwz ~ -63 rad/s vs wz_max 1.9. That is
+    exactly pi/model_dt = 62.8: resample() took headings from CONSECUTIVE points of the
+    0.30 m 8-connected grid path, which can flip direction by 180 deg, and divided by
+    model_dt. One such mode was selected (FE 84.7 vs the fallback's 68054). So enabling
+    space-time injected unfollowable references into the sampler.
+  - BUG (mine): the max_speed cascade scaled cull_distance but NOT the two critic params
+    that decide whether a collision is seen at all. At 1.5 m/s robot + 1.0 m/s obstacle
+    (2.5 m/s closing): trajectory_point_step 3 spaced the rollout checks 0.375 m apart
+    against a 0.25 m obstacle radius -- an obstacle can pass BETWEEN two checked points
+    (tunneling); and soft_distance 0.15 m vs a braking distance of v^2/2a = 0.375 m, i.e.
+    the cost only began once stopping was already impossible. Note that in dynamic_obstacles
+    mode the obstacles are filtered out of the costmap, so the critic is the ONLY protection.
+Fixes (TG-MPPI only): resample() now takes headings from a lookahead (~0.3 m) along the
+resampled path, clamps v to vx_max and w to wz_max, and REJECTS a route needing more than
+wz_max for >25% of the horizon (counted as "unfollowable" in the 100-cycle summary);
+quarantine extended to finite-but-impossible controls (|cvx| > vx_max+5*std, |cwz| >
+wz_max+5*std) -- 63 rad/s was finite, so the old check passed it; speed cascade now also
+sets trajectory_point_step (<=0.15 m check spacing; 1 at 1.5 m/s) and soft_distance
+(>= braking distance; 0.38 m at 1.5 m/s). Verified by executing speed_params().
+Builds: CUDA=OFF exit 0 / 0 warnings, CUDA=ON exit 0 / 0 warnings; installed = CUDA.
+Conceptual note for the report: space-time topology is GUIDANCE, not collision avoidance.
+It proposes sampling modes; the DynamicObstacleCritic is what avoids. T-MPC is the same --
+topology picks the passing side, per-timestep constraints do the avoiding.
