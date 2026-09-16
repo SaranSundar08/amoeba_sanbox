@@ -2757,3 +2757,26 @@ and 'speed' present in the .so.
 For the report: state plainly that DynaBARN's released worlds target Gazebo 9 and ship as
 per-obstacle binaries without source, so they cannot run under Gazebo 11 / ROS 2 Humble,
 and that the generation METHOD (random waypoints + fitted polynomial) is reproduced.
+
+## 2026-09-16 17:00 -- wall collisions at 1.5 m/s: the local costmap could not see the walls
+
+Cause (config, not planner): the local costmap plugins are ["obstacle_layer", "stvl_local",
+"inflation_layer"] -- NO static_layer -- and dynamic_obstacles:=true removes stvl_local. So
+the only wall knowledge is what the FRONT lidar (+-90 deg) saw this cycle, clipped by
+obstacle_max_range 2.5 m, while the lidar itself reaches 12 m. At 0.35 m/s that 2.5 m was
+7 s of travel; at 1.5 m/s it is 1.7 s, and the MPPI rollout reaches 4.2 m -- i.e. the robot
+planned into a region the costmap had no data for, and turning/reversing put walls it had
+never sensed behind it. The global costmap has a static_layer; the local one never did.
+Fix, inside speed_params() so BARN runs are untouched and both controllers get it (shared
+environment, not a method change): local_costmap gains static_layer (block copied from the
+global costmap's, so the plugin type is right), and obstacle_max_range/raytrace_max_range
+scale with the rollout reach -- 5.7 m / 6.7 m at 1.5 m/s. Verified by executing
+speed_params() on both yamls. No rebuild (launch is symlink-installed).
+Open question the user raised: "does this work with UNMAPPED dynamic obstacles?" -- no. The
+obstacles are fully observed (p3d ground-truth odometry per obstacle, and deliberately
+filtered OUT of the lidar so the costmap does not double-count them). That is perfect
+tracking, the opposite of unmapped, and it matches T-MPC (motion capture + Kalman filter).
+Unmapped obstacles need lidar detection + association + velocity estimation, which is also
+what blocks dynamic trials on the real robot. Cheap honest alternative for the report:
+inject noise / latency / dropout into the obstacle states and report sensitivity to
+tracking quality, instead of claiming perception the system does not have.
