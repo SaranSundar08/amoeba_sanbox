@@ -2806,3 +2806,36 @@ against a configured 10%. Effective output rate lands below the configured limit
 Thesis use: report time-to-goal / clearance / collisions vs tracking quality. It answers
 "how good must a tracker be for prediction-based avoidance to pay off?" with a measurement,
 and it is the honest bridge between the sim results and a real robot that has no tracker.
+
+## 2026-09-16 18:00 -- baseline parity audit (user asked to match everything except our modules)
+
+Structured diff of navigation_sim_tight.yaml vs navigation_tgmppi_tight.yaml: 13 shared-key
+differences, ALL intentional or inert -- every shared critic's parameters, both costmaps,
+the BT, goal/progress checkers and every core MPPI param (time_steps 56, model_dt 0.05,
+batch 2000, vx_std/wz_std, limits, temperature 0.3, gamma 0.015, motion_model) are already
+identical:
+  - plugin: must differ (the point of the comparison);
+  - critics: differs only by the TG-only FlowFieldCritic + DynamicObstacleCritic;
+  - mppi_variant: vanilla -- the fork's own switch; verified in noise_generator.cpp that it
+    dispatches to generateGaussianNoise(), i.e. plain i.i.d. Gaussian, the same sampler
+    TG-MPPI uses;
+  - lognormal_sigma / lowpass_* / bias_* / brake_* -- knobs for the fork's log-MPPI,
+    LP-MPPI, Biased-MPPI and CBF variants, inert under mppi_variant: vanilla;
+  - TrajectoryValidator -- DEAD config: grep shows neither fork reads it;
+  - TrajectoryVisualizer/publish_every_n -- visualisation only.
+Deeper check (params matching is worthless if the code differs): the shared critic sources
+were diffed namespace-normalised. constraint/cost/goal/goal_angle/path_align/path_follow/
+path_angle/prefer_forward all differ by 26-47 lines, and inspection shows those lines are
+ENTIRELY an added "#ifdef TGMPPI_WITH_CUDA" branch -- the CPU maths is byte-identical.
+obstacles/twirling/velocity_deadband are identical outright.
+=> The one real confound is compute_backend: with 'cuda' TG-MPPI runs a different
+implementation of the same critic maths AND gets much shorter cycles (8-18 ms observed),
+which is an engineering advantage, not a method one. New launch arg backend:={cpu,cuda}
+forces it; backend:=cpu puts both controllers on the identical code path. No-op on the
+baseline, which has no such parameter (verified).
+Remaining asymmetry, BY DESIGN and to be stated in the report: with dynamic_obstacles:=true
+the scan filter and predicted-obstacle critic apply to TG-MPPI only (the launch guard keeps
+the baseline stock), so the baseline sees moving obstacles as costmap marks while TG-MPPI
+sees filtered scans plus predictions. That is "TG-MPPI with prediction vs stock Nav2 as
+shipped", which is the intended claim -- but it must not be described as a pure
+topology-vs-no-topology result. For static BARN there is no asymmetry at all.
