@@ -2634,3 +2634,36 @@ goal tolerance; appended but no switches -> selection (promise inheritance / sam
 Caveat: even when it fires, only the first 2.8 s of the route is used (time_steps*model_dt).
 Builds: CUDA=OFF exit 0 / 0 warnings, CUDA=ON exit 0 / 0 warnings; installed = CUDA, log
 string verified present in libtgmppi_controller.so. Not yet run live.
+
+## 2026-09-16 02:40 -- speed raised via max_speed:= launch option (0.35 -> 1.5 m/s), with the cascade
+
+Why it matters beyond speed: at 0.35 m/s against 1.4 m/s pedestrians the robot can only
+ever YIELD, so only one homotopy class is reachable and space-time topology has nothing
+to decide. T-MPC's Jackal runs 1-2 m/s against the same pedestrians. Raising vx_max is
+what makes "pass in front vs pass behind" a real choice.
+Implemented as a launch option, NOT a yaml edit: both tight yamls are also used for BARN
+worlds with 0.7-1.5 m gaps, where 1.5 m/s would be reckless. Default '' leaves the yaml
+untouched. navigation.launch.py speed_params() rescales, from vx_max alone:
+  horizon = time_steps*model_dt = 2.8 s -> reach = vx_max*horizon
+  vx_min = -min(0.5, vmax) (reverse stays modest), vx_std = 0.33*vmax
+  local_costmap = 2*ceil(reach+1.5) square, resolution 0.05 above 8 m (cell count)
+  tgmppi_body_radius = min(reach, size/2-0.5)      [TG-MPPI only]
+  DynamicObstacleCritic.cull_distance = (vmax+1.0)*horizon + 0.9   [TG-MPPI only]
+  space-time: dt_layer 0.20, res = vmax*0.20 (search speed == vmax), horizon 3.0 s,
+  window 3.0 -> detection reach 4.5 m (was 2.0 m)  [TG-MPPI only]
+At 1.5: vx_max 1.5 / vx_min -0.5 / vx_std 0.495, costmap 12x12 m @ 0.05, body_radius 4.2,
+cull 7.9, st_res 0.30/horizon 3.0. Verified on BOTH yamls: the stock baseline receives the
+shared vehicle limits (speed, costmap) and correctly skips every TG-MPPI-only key -- a
+speed limit is shared environment, not a method change, so parity is preserved.
+Also: gazebo max_wheel_acceleration 4.0 -> 24.0 rad/s^2. At 0.165 m wheel radius the old
+value was 0.66 m/s^2 linear while the controller assumed ax_max 4.0 m/s^2 -- invisible at
+0.35 m/s, but at 1.5 m/s the sim robot would need 2.3 s to reach speed vs MPPI's assumed
+0.4 s. Now ~4.0 m/s^2, matching. Real robot: 3.0 m/s measured, 3.6 m/s on paper; 1.5 chosen
+because stopping distance at 3.0 m/s is 1.5 m (> the 0.65 m contact distance) and a 5x8 m
+Vicon volume is crossed in under 3 s.
+World regenerated for the new regime: 10 obstacles, peak speeds 0.30 -> 1.00 m/s (all below
+vx_max, so passing in front is now feasible). NOTE: this world REQUIRES max_speed:=1.5 --
+at 0.35 m/s its faster obstacles are undodgeable by construction.
+Untouched: param/navigation.yaml (real robot, already vx_max 1.0) -- needs the same cascade
+before hardware trials at 1.5.
+No rebuild needed (susag_nav2 is symlink-installed; launch + yaml + world only).
