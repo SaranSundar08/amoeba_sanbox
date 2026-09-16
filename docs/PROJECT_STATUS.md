@@ -2724,3 +2724,36 @@ Builds: CUDA=OFF exit 0 / 0 warnings, CUDA=ON exit 0 / 0 warnings; installed = C
 Conceptual note for the report: space-time topology is GUIDANCE, not collision avoidance.
 It proposes sampling modes; the DynamicObstacleCritic is what avoids. T-MPC is the same --
 topology picks the passing side, per-timestep constraints do the avoiding.
+
+## 2026-09-16 16:30 -- DynaBARN: released worlds unusable here; methodology reproduced instead
+
+Checked ~/Downloads/DynaBARN (60 worlds + 600 plugins):
+  - the per-obstacle plugins (easylibobs_*.so) link against libgazebo_*.so.9, i.e. Gazebo 9;
+    this machine runs Gazebo 11.14, so they cannot load;
+  - no plugin SOURCE ships, only .so, and each obstacle's trajectory is compiled INTO its
+    binary, so it can neither be rebuilt nor read out;
+  - the .world files contain obstacles only -- no ground plane, no walls, no map, every
+    obstacle at the same placeholder pose because its plugin moves it;
+  - nothing publishes ROS topics, while our prediction pipeline needs obstacle states.
+What IS reusable is their generator, polynomial_fit.py: random waypoints, a polynomial
+fitted through them, sampled and clipped to the arena border.
+Implemented (option A, user's call): oscillating_obstacle_plugin gained a WAYPOINT mode --
+<waypoints> (x y pairs) + <speed>, ping-pong along the track at constant speed with
+SetLinearVel so p3d still reports true velocity; without <waypoints> the sinusoid path is
+unchanged. make_open_world.py gained --motion polynomial (DynaBARN-style tracks),
+--obstacles, --speed-min/--speed-max, --scenario (writes world_<name>.world plus
+yaml_<name>.yaml map links so the launch takes world_idx:=<name>), on top of --seed.
+Track quality rules, both added after inspecting the first output: resample by ARC LENGTH
+(~0.25 m) because sampling uniformly in x put waypoints metres apart where the polynomial
+is steep and the plugin interpolates linearly (obstacle 2 was 6 points over 22.6 m); and
+require every track to pass within 2.0 m of one of the two driven legs, since an obstacle
+that never approaches the route cannot influence the run. Keepout 1.2 m around the start
+and both goals.
+Verified: 5 scenarios (dyn1..dyn5) generate, 10 obstacles each with p3d publishers, XML
+parses, zero track points outside the room; the plugin's ping-pong math replicated in
+Python holds constant speed (0.936 commanded -> mean 0.936, min 0.890 at a corner) and
+reverses at the far end. susag_gazebo_plugins rebuilt (exit 0, 0 warnings); 'waypoints'
+and 'speed' present in the .so.
+For the report: state plainly that DynaBARN's released worlds target Gazebo 9 and ship as
+per-obstacle binaries without source, so they cannot run under Gazebo 11 / ROS 2 Humble,
+and that the generation METHOD (random waypoints + fitted polynomial) is reproduced.
