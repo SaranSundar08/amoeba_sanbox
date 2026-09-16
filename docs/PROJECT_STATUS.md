@@ -2667,3 +2667,23 @@ at 0.35 m/s its faster obstacles are undodgeable by construction.
 Untouched: param/navigation.yaml (real robot, already vx_max 1.0) -- needs the same cascade
 before hardware trials at 1.5.
 No rebuild needed (susag_nav2 is symlink-installed; launch + yaml + world only).
+
+## 2026-09-16 02:55 -- CORRECTION: the Gazebo acceleration "fix" was based on a wrong unit assumption
+
+I claimed max_wheel_acceleration 4.0 meant 4.0 rad/s^2 = 0.66 m/s^2 linear and therefore
+capped the robot far below the controller's ax_max 4.0 m/s^2, and changed it to 24.0.
+That was wrong and is reverted. Verified against gazebo_ros_diff_drive's source: the
+plugin reads joint velocity in rad/s, converts to LINEAR speed with the wheel radius
+(`current_speed = joint->GetVelocity(0) * wheel_diameter/2`), and clamps the linear speed
+change by `max_wheel_accel_ * seconds_since_last_update`. So the parameter is m/s^2 at the
+wheel, and the original 4.0 ALREADY matched ax_max 4.0 m/s^2 exactly -- there was no
+mismatch to fix. Setting it to 24.0 would have removed the acceleration limit entirely
+(torque is not binding: ~18.4 kg, 4 wheels x 40 N.m / 0.165 m = ~52 m/s^2 available).
+Supporting evidence I should have checked BEFORE asserting it: ground truth in bag
+_20260916_002534 shows accelerations up to 3.19 m/s^2 (95th pct 0.99), i.e. the robot was
+already exceeding the 0.66 m/s^2 I claimed was its ceiling.
+Impact: none on any run. susag_new_model installs as a COPY, not a symlink, and was never
+rebuilt, so the 24.0 value never reached a simulation. The file now carries 4.0 with the
+units documented in place so the mistake is not repeated.
+Everything else from the speed round stands: the max_speed:= launch option and its cascade
+were verified by executing speed_params() against both yamls.
