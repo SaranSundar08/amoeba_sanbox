@@ -2780,3 +2780,29 @@ Unmapped obstacles need lidar detection + association + velocity estimation, whi
 what blocks dynamic trials on the real robot. Cheap honest alternative for the report:
 inject noise / latency / dropout into the obstacle states and report sensitivity to
 tracking quality, instead of claiming perception the system does not have.
+
+## 2026-09-16 17:30 -- tracking-quality degradation (answers "does this work with UNMAPPED obstacles?")
+
+The pipeline consumes Gazebo p3d ground truth: exact pose and velocity, every obstacle,
+no latency, no misses. That is perfect tracking (same as T-MPC's motion capture + Kalman
+filter), NOT perception. Rather than claim a tracker we do not have, the system can now be
+run on deliberately degraded states and the degradation measured.
+New: susag_nav2/scripts/obstacle_tracking_noise.py -- subscribes to every
+/moving_obstacle_*/ground_truth/odom, republishes /moving_obstacle_*/tracked/odom with
+pos_sigma, vel_sigma, latency, dropout and rate limiting (all zero = pass-through).
+Launch arg tracking_quality:={perfect,good,poor} (default perfect, i.e. nothing changes),
+active only with dynamic_obstacles:=true. When a preset is active the launch (1) starts the
+node, (2) rewrites tgmppi_spacetime_obstacle_topics to the /tracked/odom topics, and (3)
+passes the scan filter odom_pattern:=...tracked... so the costmap is cleared with the SAME
+degraded estimates -- otherwise the filter would quietly hand perfect knowledge back
+through the costmap. tracked_obstacle_scan_filter.py gained that odom_pattern parameter.
+Presets: good = 0.03 m / 0.05 m/s / 50 ms / 1% / 20 Hz; poor = 0.10 m / 0.20 m/s / 150 ms /
+10% / 10 Hz.
+Verified live against the user's running Gazebo (10 obstacles discovered): with the 'poor'
+settings, measured position error vs ground truth mean 0.125 m / max 0.309 m -- theory for
+sigma=0.10 per axis is sigma*sqrt(pi/2)=0.125 -- and 229/2180 = 10.5% of messages dropped
+against a configured 10%. Effective output rate lands below the configured limit (7 Hz vs
+10 Hz) because dropout and rate limiting compound; the presets are labels, not exact specs.
+Thesis use: report time-to-goal / clearance / collisions vs tracking quality. It answers
+"how good must a tracker be for prediction-based avoidance to pay off?" with a measurement,
+and it is the honest bridge between the sim results and a real robot that has no tracker.
