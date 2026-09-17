@@ -2839,3 +2839,31 @@ the baseline stock), so the baseline sees moving obstacles as costmap marks whil
 sees filtered scans plus predictions. That is "TG-MPPI with prediction vs stock Nav2 as
 shipped", which is the intended claim -- but it must not be described as a pure
 topology-vs-no-topology result. For static BARN there is no asymmetry at all.
+
+## 2026-09-17 -- ROOT CAUSE of the TG-MPPI corruption: dangling references in the warm-start means
+
+Evidence (log 43409, new pod-reference diagnostic): "pre-warm v 1.20 w -0.247, warm v -1.04e+34
+w -1.04e+34" and later "warm v -1.72842 w -1.72842" -- the reference was sane, the stored
+warm-start mean was garbage, and vx == wz EXACTLY, the fingerprint of freed-memory reuse.
+Cause: optimizer.cpp grouped update stored mode_nominals_ via
+`auto && mean_vx = xt::eval(xt::sum(..., 0, immediate))` (and mean_wz). With `immediate`
+the sum is already an evaluated temporary; xt::eval on a container returns a REFERENCE to
+it, lifetime extension does not apply through a returned reference, so both dangled; the
+second sum reused the freed block. Explains the whole chain since the 2026-09-15
+stabilizer port: pod references with |w| 1e16-1e34, costs -1e19..-1e25, and (with
+-ffast-math disabling every NaN check) the NaN freeze. Fix: owning xt::xtensor<float,1>.
+Stock baseline audited: its only similar line passes a LAZY expression to xt::eval (returns
+by value) -- safe. The bug was TG-MPPI-only.
+Also this round: pod reference now clamped to vehicle limits after the warm blend, with a
+capped diagnostic; obstacle waypoint mode uses a trapezoidal speed profile (stop smoothly
+over up to 1 m at each end instead of reversing instantly -- the worst case for a
+constant-velocity predictor); <speed> is now the peak.
+Builds: CUDA=OFF exit 0 / 0 warnings, CUDA=ON exit 0 / 0 warnings; installed = CUDA;
+diagnostic strings present. Plugin rebuilt exit 0.
+CONSEQUENCE FOR RESULTS: every TG-MPPI run since 2026-09-15 with tgmppi_mode_warm_start > 0
+(0.7 in the tight yaml) is suspect -- all dynamic runs and possibly the Sept 15 BARN runs.
+Re-run before reporting.
+Other findings: user's 15:07 bag was EMPTY because the record command I gave mixed an
+explicit topic list with -e (Humble ANDs them) -- verified live, regex-only command given.
+That run used the CPU build (CUDA build unfinished): 4/4 goals, 16-19 ms cycles, so
+backend:=cpu is viable for the clean comparison.
