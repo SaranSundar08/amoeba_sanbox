@@ -2953,3 +2953,25 @@ the unbiased group shrinks from ~1600 to ~2000/(n_pods+1) rows, pods win more of
 BARN behaviour (currently working) must be re-validated -- which every TG-MPPI result since
 2026-09-15 needs anyway. Plan: implement as an opt-in parameter, default = current
 behaviour, so nothing changes until it is switched on. Stock baseline unaffected either way.
+
+## 2026-09-17 -- tgmppi_group_allocation: opt-in sandbox-parity sample split
+
+New TG-MPPI parameter tgmppi_group_allocation (default "legacy" = unchanged behaviour):
+"equal" gives every group -- each active pseudopod / space-time mode, the wait group if
+offered, and the unguided fallback -- a near-equal share of the batch, as amoeba_sandbox
+allocate_group_counts() does; tgmppi_bias_strength is then unused and only the assist ramp
+scales the guided part. Pods are split uniformly instead of promise-weighted in that mode.
+Launch arg group_allocation:={legacy,equal} (no-op on the stock baseline, verified). New log
+line every 200 cycles: "[TGMPPI alloc] <mode> -- groups (key:rows)" to confirm the split used.
+Split arithmetic (batch 2000, assist fully on), with the fallback's expected-minimum head
+start as -sigma*sqrt(2 ln N) difference:
+  legacy, 3 pods:            133/133/133, fallback 1600  -> +0.71 sigma
+  legacy, 3 pods + 2 ST:     80 x5,      fallback 1600  -> +0.88 sigma
+  equal,  3 pods:            500 x3,     fallback 500   ->  0.00
+  equal,  3 pods + wait:     400 x3, wait 400, fb 400   ->  0.00
+  equal,  3 pods + 2 ST:     ~333 x5,    fallback 333   ->  0.00
+(switch margin is 0.3, so under legacy a proposal practically cannot win.)
+Builds: CUDA=OFF exit 0 / 0 warnings, CUDA=ON exit 0 / 0 warnings; installed = CUDA.
+Not yet run live. Next: full vs full+equal vs no_topology on the same world, then re-check
+BARN world 48 with equal (fallback shrinks to ~500 rows -> less plain-MPPI exploration in
+narrow gaps). Also: sandbox repo rebase succeeded but `git push -u origin main` still pending.
