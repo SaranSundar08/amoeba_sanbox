@@ -3040,3 +3040,37 @@ if the workspace is not sourced (my zsh shell had sourced setup.bash -> overlay 
 Correction recorded: the Gazebo launch package is `susag_updated_model_description` (directory
 susag_new_model); the `ros2 launch susag_new_model ...` commands I gave earlier were wrong.
 Before thesis runs: commit + push both repos -- the smoke trial recorded both revisions as -dirty.
+
+## 2026-09-17 -- benchmark stop/resume hardened; thesis_dyn run stopped at trial 5; route figure
+
+The user's thesis_dyn run (started with the runner version from e3b6f67) died during trial 5
+(dyn1 B rep1): no screen session, runner and trial child gone, Gazebo + Nav2 orphaned
+(parent systemd --user) for 5 min. Trials 1-4 are intact and recorded against clean e3b6f67:
+dyn1 A rep0 [ok ok aborted aborted] (ended early), A rep1 [4/4], A rep2 [aborted aborted],
+B rep0 [4/4] -- stock baseline 4/4 vs 0/2 under identical starts, i.e. repeats are needed.
+Orphans stopped via SIGINT to their own process groups (all gone in 12 s).
+Stop/resume problems found and fixed in benchmark_dynamic.py:
+ 1. an interrupted trial left a partial bag dir: `ros2 bag record -o` refuses an existing dir
+    and the scorer could read the stale bag -> the trial child now wipes its dir first (it only
+    runs for trials that must be (re)done);
+ 2. subprocess.run killed the trial 0.25 s after Ctrl+C, cutting its cleanup short -> Popen +
+    wait up to 90 s for the trial to stop Gazebo/Nav2/bag;
+ 3. closing the terminal (SIGHUP) / kill (SIGTERM) killed without cleanup -> both now raise
+    KeyboardInterrupt, so finally-blocks run;
+ 4. rclpy's own SIGINT handler surfaces as ExternalShutdownException in the child; when only the
+    child saw the interrupt (runner started with SIGINT ignored), the parent treated it as an
+    ordinary failed trial and moved on -> child exits 130 on any interrupt, parent stops the
+    matrix on 130 / -SIGINT / -SIGTERM / -SIGHUP.
+Verified live (1-leg trials): interrupt with the stack up -> stopped in ~16 s, exit 130, resume
+message, zero leftover processes, no trial.json -- both with SIGINT reaching the runner
+(terminal-like) and child-only; re-running the same --run redid the interrupted trial from
+scratch (succeeded, scored, bag finalised); a third run printed "done already, skipping".
+Figure: docs/figures/benchmark_route_dyn.{pdf,png} (+ make_benchmark_route_figure.py): real
+occupancy map, start (0,1) facing +y with the footprint at true size, goals A (2.5,11.3) arrival
+76.4 deg (leg 1) / 63.9 deg (leg 3) and B (-2.8,0.5) arrival -116.1 deg, 1.2 m keep-outs, and per
+world the 10 obstacle tracks with t=0 discs at true size. Palette: reference slots 1-2 (route
+blue, goals orange), validator PASS all-pairs light; obstacles neutral. Visible in the figure:
+where a fitted polynomial leaves the room the clipped track joins the next in-room point with a
+straight chord (e.g. near y=12 and y=2.2) -- the obstacle really follows those chords.
+Before resuming thesis_dyn: commit + push benchmark_dynamic.py (currently modified), so resumed
+trials record a clean revision; trials 1-4 keep e3b6f67 (only stop/resume handling differs).
