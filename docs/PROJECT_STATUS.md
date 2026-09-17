@@ -3013,3 +3013,30 @@ Findings (with n=1 and manual goals -- anecdotal until repeated with scripted go
  - Equal allocation confirmed live: "equal 0:400 1:400 2:400 1003:399 -1:401"; legacy
    "0:198 1:100 2:101 -1:1601".
 Next: scripted identical goals, no preemption, >= 3-5 runs per condition per world.
+
+## 2026-09-17 -- benchmark_dynamic.py: scripted, identical dynamic-obstacle trials
+
+New src/susag_nav2/benchmark/benchmark_dynamic.py (sibling of benchmark_barn.py, same
+one-child-process-per-trial pattern). What makes trials identical: Gazebo restarted per trial
+(sim time and obstacle positions from zero); FIRST GOAL AT A FIXED SIM TIME (default 30 s,
+late_start flagged otherwise); fixed route start->A(2.5,11.3)->B(-2.8,0.5)->A->B, each goal only
+after the previous finished (no preemption); dedicated ROS_DOMAIN_ID 42 and per-trial ROS_LOG_DIR;
+bag + git revisions of both repos in trial.json. Conditions A/B/Bp/C/D via the launch switches.
+Ground-truth scoring per leg (effective speed on successful legs, min clearance, contacts with
+first-contact who-closed-the-gap, wall samples, recoveries) plus controller log stats; --report
+writes legs.csv + report.md; --score-bag re-scores manual bags; resume by reusing --run.
+Validation: the scorer reproduced the hand analysis of dyn1_B_equal160633 exactly (4 legs,
+durations, the obstacle-5 contact, 0 walls, controller stats). Live smoke test (B, dyn1, 1 leg):
+stack ready at sim 4.6 s, goal sent at exactly 30.0 s, leg succeeded 13.3 s (10.6 m straight,
+10.47 m driven, 0 contacts), bag finalised, nothing left running, report generated. ~60 s for a
+1-leg trial -> ~2.3 h for 4 conditions x 5 worlds x 3 reps at 4 legs.
+Bugs found and fixed while building it: (1) stray-process cleanup used `pkill -f gzserver`, which
+also killed the SHELL that launched the benchmark when its command text contained "gzserver"
+(first smoke test died, exit 144) -- cleanup now excludes the process's own ancestry, proven with
+a parent whose command line contains the pattern; (2) added a preflight that refuses in seconds
+if the workspace is not sourced (my zsh shell had sourced setup.bash -> overlay missing); (3)
+--report picked the "latest" run by name, so a named run shadowed dated ones -- now by mtime;
+(4) the controller-log finder could pick launch.log -- container logs first now.
+Correction recorded: the Gazebo launch package is `susag_updated_model_description` (directory
+susag_new_model); the `ros2 launch susag_new_model ...` commands I gave earlier were wrong.
+Before thesis runs: commit + push both repos -- the smoke trial recorded both revisions as -dirty.
