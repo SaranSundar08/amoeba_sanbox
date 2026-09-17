@@ -2892,3 +2892,44 @@ Still open: space-time routes non-distinct in nearly every cycle (55/55, 72/74, 
 despite the homotopy constraint -- needs investigation. Cycle time mean 21.9 ms (max window
 28.1), 3 missed deadlines. One run is not a statistic: the dyn1..dyn5 x 4-condition ablation
 is still what turns this into a result, and all TG-MPPI runs since 2026-09-15 need re-running.
+
+## 2026-09-17 -- why space-time topology contributes almost nothing (measured, not guessed)
+
+Funnel over 1200 controller cycles (log 59795): crossings detected 1109 -> searches feasible
+1102 -> modes appended 899 -> non-distinct 1053 -> SELECTED 1 (one "mode switch -> 1003").
+Standalone harness (scratchpad st_harness.cpp, the real space_time_search.cpp, ROS-free):
+head-on crossings at y = 1.5/2.0/2.5 m, obstacle 0.5/0.8/1.0 m/s timed to meet a robot
+driving straight at the search speed. Both searches feasible in 9/9, but distinct in only
+2/9. Wait routes pass 0.60-0.68 m from the obstacle, detours 0.67-0.86 m; the smallest
+"both routes simultaneously within X" over layers is 0.75-0.95 m, so the 0.8 m relevance
+in routesAreDistinct is rarely satisfied. Raising it to 1.2/1.6 m flips only 2 more cases;
+5/9 stay non-distinct.
+Causes, in order of weight:
+ 1. WRONG INVARIANT. routesAreDistinct (and the side constraint added 2026-09-16, which
+    reuses the same test) asks whether both routes are near the obstacle AT THE SAME TIME on
+    opposite sides. Pass-before and pass-behind routes are near the obstacle at DIFFERENT
+    times -- one crosses its line of motion before it arrives, the other after it has gone --
+    so at any single layer usually only one is close. The test is structurally blind to
+    exactly the distinction it exists for, and the "constraint" is inactive in most layers,
+    leaving the second search effectively unconstrained. A crossing-order invariant (at the
+    moment the route crosses the obstacle's line of motion, is the obstacle before or after
+    that point?) is the right test -- the space-time analogue of a winding/H-signature.
+ 2. SELECTION IS STACKED AGAINST PROPOSALS. Grouped update is winner-takes-all: a group that
+    does not win contributes nothing to the command. bias_strength 0.2 gives 400 biased rows
+    shared by up to 5 modes (~80 each) against a ~1600-row fallback group, and free energy
+    is bounded below by the group minimum cost, whose expectation falls like -sigma*sqrt(2 ln N):
+    about -2.96 sigma at N=80 vs -3.84 sigma at N=1600, i.e. the big group wins by sample count
+    alone by roughly 0.9 sigma -- far above the 0.3 switch margin. Stabilizers (min dwell 10,
+    confirm 3) then suppress transient modes, and space-time keys are slot-based (1003/1004),
+    so the same key can mean pass-before in one cycle and pass-behind in the next -- hysteresis
+    accumulates on a slot, not a homotopy class.
+ 3. JAGGED REFERENCES. 259/1200 proposals rejected as unfollowable (0.30 m 8-connected grid).
+ 4. THE SCENE DOES NOT NEED IT. Open room, 2.8 s horizon, accurate constant-velocity
+    predictions: plain MPPI sampling plus the DynamicObstacleCritic already finds the passing
+    side (last run: zero robot-caused collisions with space-time contributing ~nothing).
+Fix candidates: (a) crossing-order invariant for both the distinctness test and the second
+search's constraint; (b) class-based keys (pass-before / pass-behind) so hysteresis tracks a
+homotopy class; (c) equal sample shares or size-corrected free energy -- a design change to
+the sandbox-ported rule, to discuss before doing. Honest fallback framing for the thesis:
+in open scenes with accurate prediction, topology guidance adds little; its value is in
+cluttered/narrow scenes where local sampling cannot find the other class.
