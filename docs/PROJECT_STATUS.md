@@ -2933,3 +2933,23 @@ homotopy class; (c) equal sample shares or size-corrected free energy -- a desig
 the sandbox-ported rule, to discuss before doing. Honest fallback framing for the thesis:
 in open scenes with accurate prediction, topology guidance adds little; its value is in
 cluttered/narrow scenes where local sampling cannot find the other class.
+
+## 2026-09-17 -- CORRECTION: the group-size bias is a porting deviation, not a sandbox rule
+
+Earlier today I called equal sample shares "a change to the sandbox-ported rule". Checked
+grouped_sampling.py: sample_fixed_groups() allocates ALL samples across ALL modes, by default
+with allocate_group_counts() (near-equal: total // n_modes each), optionally promise-weighted
+via allocate_weighted_counts() with at least one sample per mode -- and the unguided nominal
+fallback is itself one of those modes (promise None). So in the sandbox the fallback group is
+the same size as each pseudopod group. The Nav2 port instead recentres only
+bias_strength (0.2) of the batch and leaves the other 80% as a separate fallback group
+(~1600 rows vs ~80-130 per pod) -- that asymmetry is what gives the fallback its free-energy
+advantage from sample count alone. The free-energy formula itself (V3,
+cmin - lambda*log(mean likelihood)) matches the sandbox exactly; the sandbox also has a V4
+importance-corrected variant with a V3 fallback guard (guard_importance_statistics), which
+the port does not implement.
+So equal shares would RESTORE sandbox parity rather than invent a rule. Risk if enabled:
+the unbiased group shrinks from ~1600 to ~2000/(n_pods+1) rows, pods win more often, and
+BARN behaviour (currently working) must be re-validated -- which every TG-MPPI result since
+2026-09-15 needs anyway. Plan: implement as an opt-in parameter, default = current
+behaviour, so nothing changes until it is switched on. Stock baseline unaffected either way.
