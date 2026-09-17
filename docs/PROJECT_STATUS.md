@@ -2867,3 +2867,28 @@ Other findings: user's 15:07 bag was EMPTY because the record command I gave mix
 explicit topic list with -e (Humble ANDs them) -- verified live, regex-only command given.
 That run used the CPU build (CUDA build unfinished): 4/4 goals, 16-19 ms cycles, so
 backend:=cpu is viable for the clean comparison.
+
+## 2026-09-17 15:25 run (bag dyn1_20260917_152541, 78.6 s, CUDA, after the dangling-reference fix)
+
+Ground-truth collision analysis (scratchpad collide.py: obstacle radii from world_dyn1.world,
+Nav2 footprint rectangle 0.84 x 0.68 m, contact = footprint clearance < 0.02 m, so it is
+conservative w.r.t. Gazebo's own collision geometry; velocities by finite differences):
+  - ONE contact episode in 78.6 s: t=78.5, obstacle 1, clearance +0.019 m (touching, not
+    penetrating), robot speed 0.01 m/s -- the obstacle touched the PARKED robot 6 s after
+    the last goal was reached (72.4 s). Not a controller failure.
+  - ZERO wall contacts (the local-costmap static layer + scaled sensor range fix holds).
+  - All legs in the bag reached: (-2.87,0.53)->(2.85,11.27) 22.1 s; (2.86,11.29)->(-3.14,0.51)
+    32.0 s incl. one recovery; (-3.12,0.52)->(3.14,2.34) 6.6 s.
+Fix verified: 0 corrupt samples, 0 quarantines, 0 NaN events (dozens per run before). The 20
+remaining pod-reference warnings are benign: warm v <= 2.01 m/s, |warm w| <= 1.18 rad/s,
+v == w in 0 lines (before: 1e16-1e34 with v == w exactly). Sample means can exceed vx_max
+because sampled cvx is unclamped; the reference clamp handles it.
+The one failure burst (53.7 s: 3x "Optimizer fail to compute path", abort, retry, recovered
+0.5 s later) was NOT an obstacle conflict (nearest 1.8 m): robot turning at wz_max 1.9,
+~1 m/s, along the west wall with the footprint edge 0.14 m off the inner wall face -- inside
+the 0.40 m inflation, so CostCritic flagged every rollout as colliding. Goal (-3.14, 0.51)
+sits 0.86 m from that wall; high speed + corner goals make this tight.
+Still open: space-time routes non-distinct in nearly every cycle (55/55, 72/74, 100/100 ...)
+despite the homotopy constraint -- needs investigation. Cycle time mean 21.9 ms (max window
+28.1), 3 missed deadlines. One run is not a statistic: the dyn1..dyn5 x 4-condition ablation
+is still what turns this into a result, and all TG-MPPI runs since 2026-09-15 need re-running.
