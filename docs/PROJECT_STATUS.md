@@ -2975,3 +2975,41 @@ Builds: CUDA=OFF exit 0 / 0 warnings, CUDA=ON exit 0 / 0 warnings; installed = C
 Not yet run live. Next: full vs full+equal vs no_topology on the same world, then re-check
 BARN world 48 with equal (fallback shrinks to ~500 rows -> less plain-MPPI exploration in
 narrow gaps). Also: sandbox repo rebase succeeded but `git push -u origin main` still pending.
+
+## 2026-09-17 16:04-16:12 -- first 4-condition comparison on dyn1 (manual goals, n=1 each)
+
+Conditions identified from each run's own controller log, not bag names: B full legacy
+(alloc lines "legacy"), B' full equal (alloc "equal"), D no_topology (TG-MPPI, no alloc /
+space-time lines), A stock (nav2_mppi_controller::MPPIController). All TG runs backend cpu,
+max_speed 1.5, dynamic_obstacles on. Scored with scratchpad score_runs.py (legs from rosout
+"Begin navigating"/"Goal succeeded"; a new goal before arrival = PREEMPTED; a "succeeded"
+leg that moved <25% of its straight distance = EXCLUDED duplicate; contacts = footprint
+clearance < 0.02 m during active legs, classified by who closed the gap at first touch).
+
+                 A stock      D plain+pred     B full legacy        B' full equal
+goals/completed  1/0 (bag     2/0 (1 preempted, 5 -> 2 done, 2       4/4
+                 cut at 18.9s) 1 unfinished 36s) preempted, 1 dup
+recoveries       3            6                0                    0
+obst. contacts   3 (1 robot   2 (obstacles     0                    1 (obstacle ran in,
+                 drove in)    ran in, sandwich)                     touch)
+min clearance    -0.09 m      -0.19 m          +0.09 m              -0.09 m
+wall contact     0            1 episode*       0                    0
+eff. speed       --           --               0.57 m/s (2 legs)    0.78 m/s (4 legs)
+cycle / missed   n/a / 3      16.7 ms / 6      21.3 ms / 18         19.2 ms / 2
+*D's wall episode (47.9-52.3 s): NOT the back-up recovery (that ran at 53.6 s) and NOT the
+controller -- cmd was zero throughout. The robot was sandwiched by obstacles 4 and 10 at
+43.5-44.0 s while moving 0.8-1.5 m/s, the controller then failed repeatedly, and the robot
+skidded ~3 m sideways (heading -64 deg, travelling +x) into the east wall. Pose-forced
+obstacles ignore physics and can shove the robot unphysically, so only FIRST contact is a
+valid collision measure; anything after it is contaminated.
+Findings (with n=1 and manual goals -- anecdotal until repeated with scripted goals):
+ - Both TG-MPPI variants finished legs with zero recoveries; plain MPPI + prediction (D)
+   and stock (A) collided and failed. This CONTRADICTS my earlier hypothesis that D would
+   match B: the prediction critic alone was not enough here, and the pseudopod guidance +
+   grouped update appear to do real work.
+ - Space-time contributed nothing in either B or B' (0 selections; non-distinct 251/275 and
+   322/327). The benefit, if confirmed, is pseudopods + grouped update + stabilizers.
+ - B vs B' is inconclusive: B had two legs preempted by manual re-goaling.
+ - Equal allocation confirmed live: "equal 0:400 1:400 2:400 1003:399 -1:401"; legacy
+   "0:198 1:100 2:101 -1:1601".
+Next: scripted identical goals, no preemption, >= 3-5 runs per condition per world.
