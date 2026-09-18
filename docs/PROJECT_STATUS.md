@@ -3074,3 +3074,21 @@ where a fitted polynomial leaves the room the clipped track joins the next in-ro
 straight chord (e.g. near y=12 and y=2.2) -- the obstacle really follows those chords.
 Before resuming thesis_dyn: commit + push benchmark_dynamic.py (currently modified), so resumed
 trials record a clean revision; trials 1-4 keep e3b6f67 (only stop/resume handling differs).
+
+## 2026-09-18 -- thesis_dyn results (60/60 trials, dyn1..dyn5 x A/B/Bp/D x 3 reps)
+
+Validity: 0 late starts (stack ready at sim 3.9-5.2 s, goal at 30.0), 0 launch/score errors, all
+10 obstacle topics in every bag, split confirmed (B legacy, Bp equal). Controller identical across
+all trials (only uncommitted diff vs e3b6f67 = runner stop/resume handling).
+Per condition (60 planned legs each; unattempted legs after early termination count as failed):
+  A stock        19/60 legs (32%), 1/15 trials all-ok, contact in 15/15 trials (4 robot-caused)
+  B legacy       57/60 (95%), 14/15, contact 10/15 (5 robot-caused), eff 0.72 m/s
+  Bp equal       57/60 (95%), 14/15, contact  7/15 (3 robot-caused), eff 0.78 m/s
+  D plain+pred   53/60 (88%), 13/15, contact  6/15 (0 robot-caused), eff 0.71 m/s
+Tests (per trial, n=15 v 15): A vs B/D legs-ok p<0.001, contact p=0.042 / 0.001 -> significant.
+B vs D p=0.55 (legs), 0.27 (contact); Bp vs D 0.55 / 1.0; B vs Bp 1.0 / 0.46; Bp faster than B
+p=0.074 (trend only). Per world, losses: A everywhere (dyn5 0/12, dyn4 1/12); B dyn1; Bp dyn1+dyn3;
+D dyn1+dyn5. Space-time over 15 trials: ~11k detections, ~96% non-distinct, 12 (B) / 17 (Bp)
+selections -> effectively inactive.
+Conclusion: the large gain over stock Nav2 comes from predicted-obstacle avoidance (+ scan filter),
+not from topology; B/Bp/D are statistically indistinguishable in open dynamic rooms at n=15.
