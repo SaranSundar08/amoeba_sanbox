@@ -51,27 +51,30 @@ B 57/59, 10 contacts; Bp 57/59, 9; D 53/57, 9. Prediction gives the whole gain o
 stock (p<0.001). B/Bp/D statistically indistinguishable at n=15 — topology did not
 separate from prediction.
 
-## CRITICAL — do not write this up wrong
-The "96.7% of space-time routes are non-distinct" figure measures the OLD
-synchronised-time side test being structurally blind, NOT route redundancy. That test
-required both routes near the same obstacle at the same time layer; a pass-before and
-a pass-behind route are near it at DIFFERENT layers by construction, so it defaulted to
-"not distinct". Replaced on main (commit 764ce21) by T-MPC's winding-number test
-(λ = (1/2π)Σ wrapped Δθ, pass threshold 1/(4π)). Do NOT claim "space-time regenerates
-duplicate routes".
+## Space-time distinctness — RESOLVED 2026-09-20
+The old synchronised-time side test was structurally blind (it needed both routes near
+the same obstacle at the same time layer; pass-before and pass-behind are near it at
+DIFFERENT layers by construction, so it defaulted to "not distinct"). Replaced on main
+(commit 764ce21) by T-MPC's winding-number test (λ = (1/2π)Σ wrapped Δθ, threshold
+1/(4π)). Re-measured with the WORKING test: 94.1% of feasible space-time routes are
+still homotopically non-distinct (vs 96.7% with the broken test), over 28,000 cycles.
+=> The redundancy is REAL, not an artifact. It is now a defensible finding, because it
+was re-measured with a validated instrument. Cite the 94.1% figure, not 96.7%.
 
 Also void: the Sept 19 runs `st_winding_check` / `st_winding_3rep` (0/12 legs, 11
 recoveries/leg). They ran on the broken tf2 stack — the control on main failed
 identically (6480 `tf_help` errors vs 0 in good runs). Not the branch's fault.
 
-## In flight
-`thesis_dyn_winding` — the 60-trial re-run with the winding test on the restored
-stack. Started 17:16, was at 49/60. Check: `ls <run>/*/*/* -d | wc -l` and `report.md`.
+## Results — thesis_dyn_winding (60/60 COMPLETE, corrected test, restored stack)
+legs ok: A 17/40 (43%), B 44/46 (96%), Bp 52/58 (90%), D 53/57 (93%).
+contacts: A 27/40, B 10/46, Bp 14/58, D 9/57. cycle ms: B 19.7, Bp 20.1, D 15.7.
+=> Prediction gives the whole gain over stock. B vs D STILL indistinguishable: topology
+does not separate from prediction even with a working distinctness test, and costs
+~4 ms/cycle. Both thesis_dyn and thesis_dyn_winding agree. NOTE leg denominators differ
+(B 46 vs D 57) — quote percentages, and find out why B produced fewer legs.
 
 ## Next
-1. When the re-run finishes: regenerate the distinctness rate, and check whether
-   B vs D changes now that distinct modes can actually be detected.
-2. Re-run BARN static (`benchmark_barn.py`) — the only prior run is 14 trials on the
+1. Re-run BARN static (`benchmark_barn.py`) — the only prior run is 14 trials on the
    broken stack, worlds 42/93 only.
 3. Thesis draft: `docs/thesis/main.tex`, IEEEtran journal, double column, 10–12 pp.
    `\todo{}` = my prose to write, `\pending{}` = awaiting the re-run. `\draftfalse`

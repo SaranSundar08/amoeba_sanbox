@@ -1,0 +1,86 @@
+\relax 
+\citation{williams2017mppi}
+\citation{williams2018mppi}
+\citation{fox1997dwa}
+\citation{trevisan2024biased}
+\@writefile{toc}{\contentsline {section}{\numberline {I}Introduction}{1}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {II}Related Work}{1}{}\protected@file@percent }
+\citation{bhattacharya2012hsignature}
+\citation{roesmann2017teb}
+\citation{degroot2025tmpc}
+\citation{macenski2023nav2}
+\citation{williams2017mppi}
+\citation{williams2018mppi}
+\citation{trevisan2024biased}
+\@writefile{toc}{\contentsline {section}{\numberline {III}Background and Problem Formulation}{2}{}\protected@file@percent }
+\newlabel{sec:problem}{{III}{2}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-A}}Information-theoretic stochastic control}{2}{}\protected@file@percent }
+\newlabel{eq:trajectory-cost}{{1}{2}}
+\newlabel{eq:free-energy-objective}{{2}{2}}
+\newlabel{eq:optimal-control-distribution}{{4}{2}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-B}}Classical MPPI}{2}{}\protected@file@percent }
+\newlabel{eq:mppi}{{7}{2}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-C}}Biased MPPI and ancillary controllers}{2}{}\protected@file@percent }
+\newlabel{eq:biased-mppi-weight}{{8}{2}}
+\newlabel{eq:biased-mppi-update}{{9}{2}}
+\newlabel{eq:biased-mixture}{{10}{2}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-D}}Multimodal failure addressed by TG-MPPI}{3}{}\protected@file@percent }
+\newlabel{eq:grouped-objective}{{11}{3}}
+\@writefile{toc}{\contentsline {section}{\numberline {IV}Method: TG-MPPI}{3}{}\protected@file@percent }
+\newlabel{sec:method}{{IV}{3}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-A}}Geodesic flood field and the robot-centred body}{3}{}\protected@file@percent }
+\newlabel{eq:local-geodesic}{{12}{3}}
+\newlabel{eq:geodesic-body}{{13}{3}}
+\newlabel{eq:membrane-short}{{14}{3}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-B}}Pseudopod branches as guidance trajectories}{3}{}\protected@file@percent }
+\newlabel{eq:promise-short}{{15}{3}}
+\newlabel{eq:navigation-short}{{16}{3}}
+\newlabel{eq:ancillary-short}{{17}{3}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-C}}Grouped sampling and per-group free energy}{3}{}\protected@file@percent }
+\newlabel{eq:freeenergy}{{18}{3}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-D}}Space-time routes}{3}{}\protected@file@percent }
+\newlabel{eq:cv-prediction}{{19}{3}}
+\citation{degroot2025tmpc}
+\citation{bhattacharya2012hsignature}
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Sandbox execution in BARN world 48. The geodesic body (blue), membrane (cyan), navigation directions (arrows), retained pseudopods (dotted curves) and driven trace (red) are shown at three field rebuilds. This is an implementation-derived explanatory visual, not a scored Nav2 benchmark trial.}}{4}{}\protected@file@percent }
+\newlabel{fig:amoeba-motion}{{1}{4}}
+\newlabel{eq:spacetime-free-short}{{20}{4}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-E}}Homotopy distinctness}{4}{}\protected@file@percent }
+\newlabel{sec:method-distinct}{{\mbox  {IV-E}}{4}}
+\newlabel{eq:winding}{{21}{4}}
+\@writefile{toc}{\contentsline {section}{\numberline {V}Implementation}{4}{}\protected@file@percent }
+\newlabel{sec:impl}{{V}{4}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-A}}Development sandbox and transfer to Nav2}{4}{}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Synthetic sandbox demonstration of space--time topology. Left: plan view of wait and detour candidates around a moving obstacle. Right: the same candidates in $(x,y,t)$, where the obstacle trajectory forms an exclusion tube. The diagram explains the proposal mechanism; quantitative claims are drawn only from the Gazebo benchmark.}}{5}{}\protected@file@percent }
+\newlabel{fig:spacetime-topology}{{2}{5}}
+\@writefile{toc}{\contentsline {section}{\numberline {VI}Experimental Setup}{5}{}\protected@file@percent }
+\newlabel{sec:setup}{{VI}{5}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VI-A}}Robot and simulator}{5}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VI-B}}Scenarios}{5}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VI-C}}Conditions}{5}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VI-D}}Protocol and metrics}{5}{}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Benchmark start pose, goal poses and obstacle tracks for \texttt  {dyn1}--\texttt  {dyn5} over the occupancy map used in all trials.}}{6}{}\protected@file@percent }
+\newlabel{fig:route}{{3}{6}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VI-E}}Physical SLIP validation plan}{6}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {VII}Results}{6}{}\protected@file@percent }
+\newlabel{sec:results}{{VII}{6}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VII-A}}Prediction accounts for the gain over the baseline}{6}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VII-B}}Topology relative to prediction}{6}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VII-C}}Space-time distinctness}{6}{}\protected@file@percent }
+\newlabel{sec:distinctness}{{\mbox  {VII-C}}{6}}
+\@writefile{toc}{\contentsline {section}{\numberline {VIII}Discussion and Limitations}{6}{}\protected@file@percent }
+\bibstyle{IEEEtran}
+\bibdata{refs}
+\bibcite{williams2017mppi}{1}
+\bibcite{williams2018mppi}{2}
+\bibcite{fox1997dwa}{3}
+\bibcite{trevisan2024biased}{4}
+\bibcite{bhattacharya2012hsignature}{5}
+\bibcite{roesmann2017teb}{6}
+\bibcite{degroot2025tmpc}{7}
+\bibcite{macenski2023nav2}{8}
+\@writefile{lot}{\contentsline {table}{\numberline {I}{\ignorespaces Dynamic benchmark, 60 trials (15 per condition, four legs each). Effective speed is straight-line distance over time on successful legs. Contacts are scored from ground truth.}}{7}{}\protected@file@percent }
+\newlabel{tab:main}{{I}{7}}
+\@writefile{toc}{\contentsline {section}{\numberline {IX}Conclusion}{7}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{References}{7}{}\protected@file@percent }
+\gdef \@abspage@last{7}
