@@ -3109,3 +3109,36 @@ cleared every torch/cuda/cudnn dependency resolves via RPATH; with ROS sourced a
 on LD_LIBRARY_PATH, 0 missing libs. Also relevant for the Jetson port.
 Benchmark data unaffected: all 60 thesis_dyn trials show the right plugin loaded
 (45 TgMppiController, 15 stock MPPIController) and zero dlopen failures.
+
+## 2026-09-20 -- RViz froze seconds after launch: tf2 0.25.23 deadlock, fixed by pinning the ROS stack
+
+Symptom: RViz came up, then the window went dead a few seconds later. Not a crash -- the
+process stayed alive at ~0% CPU on the main thread, and Nav2 kept navigating underneath.
+Diagnosis (gdb backtrace of a second RViz reproducing it): a lock-order inversion in tf2.
+  Thread 1  (Qt render loop): a PolygonStamped display callback -> tf2_ros::Buffer::
+            waitForTransform -> holds the Buffer mutex -> BufferCore::addTransformable-
+            Request -> blocks on frame_mutex_
+  Thread 54 (TF listener):    /tf callback -> BufferCore::setTransform -> holds
+            frame_mutex_ -> testTransformableRequests() -> blocks on the Buffer mutex
+Cause: an unattended apt upgrade on 2026-09-18 23:29 pulled 508 packages, including
+tf2/tf2_ros/geometry2 0.25.22 -> 0.25.23, rviz 11.2.28 -> 11.2.29, message_filters
+4.3.19 -> 4.3.20, rclcpp 16.0.19 -> 16.0.21 and the whole Nav2 1.1.20 rebuild. The
+deadlocking pair lives in tf2/tf2_ros. Everything worked until that upgrade.
+Fix (verified working): the ROS apt source now points at
+http://snapshots.ros.org/humble/2026-08-07/ubuntu, every installed ros-humble package was
+downgraded to its snapshot version (all 579 resolve; versions match the pre-upgrade set
+exactly) and all 579 are apt-mark hold. Note the snapshot repo is signed by "ROS Snapshot
+builder" (4B63CF8F...CBF125EA), a DIFFERENT key from packages.ros.org's Open Robotics key
+-- it needs its own keyring or apt update rejects the repo as unsigned. Pin list kept at
+~/robohouse_ws/ros_humble_2026-08-07_pins.txt.
+Secondary fix kept (susag_new_model/urdf/susag_updated_model.gazebo): publish_wheel_tf
+true -> false. The four wheel joints are 'continuous', so robot_state_publisher already
+owns base_link->*_wheel_1 from /joint_states at 10 Hz; the diff_drive plugin was
+publishing the SAME four transforms at 100 Hz, a duplicate TF authority and 400 of the
+~500 /tf msg/s. That rate is what made the tf2 race fire within seconds rather than
+occasionally. It is NOT the cause and it is behaviour-neutral for Nav2 (nothing consumes
+wheel frames), so the thesis_dyn results stay comparable -- but the change is recorded
+here because it postdates them.
+Benchmark integrity: all 60 thesis_dyn trials ran 2026-09-17 23:18 -> 2026-09-18 17:40,
+i.e. BEFORE the 23:29 upgrade, on the same stack the snapshot restores. The pending BARN
+static re-run therefore lands on the same stack as the dyn results -- no confound.
