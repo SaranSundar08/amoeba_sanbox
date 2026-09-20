@@ -3092,3 +3092,20 @@ D dyn1+dyn5. Space-time over 15 trials: ~11k detections, ~96% non-distinct, 12 (
 selections -> effectively inactive.
 Conclusion: the large gain over stock Nav2 comes from predicted-obstacle avoidance (+ scan filter),
 not from topology; B/Bp/D are statistically indistinguishable in open dynamic rooms at n=15.
+
+## 2026-09-20 -- LibTorch RPATH baked into the plugin (Nav2 bringup failed in a fresh terminal)
+
+Symptom: `ros2 launch susag_nav2 navigation.launch.py` in a new terminal aborted bringup --
+"Failed to create controller ... dlopen error: libc10.so: cannot open shared object file" --
+and RViz then showed nothing (no costmaps/plan), which looked like an RViz crash but was not.
+Cause: the CUDA build links LibTorch, which pluginlib dlopen()s at runtime, but the .so had NO
+RPATH, the workspace setup.bash does not add libtorch, and ldconfig does not know it -- so it
+only worked in terminals where LD_LIBRARY_PATH happened to be set.
+Fix: CMakeLists (TGMPPI_WITH_CUDA branch) now sets INSTALL_RPATH/BUILD_WITH_INSTALL_RPATH to
+${TORCH_INSTALL_PREFIX}/lib (fallback derived from Torch_DIR) for both libraries; the stale
+"make sure ... is on LD_LIBRARY_PATH" comment is gone. Rebuilt CUDA=ON, exit 0, 0 warnings.
+Verified: RUNPATH=/home/saran/libtorch_cu126/libtorch/lib on both libs; with LD_LIBRARY_PATH
+cleared every torch/cuda/cudnn dependency resolves via RPATH; with ROS sourced and no libtorch
+on LD_LIBRARY_PATH, 0 missing libs. Also relevant for the Jetson port.
+Benchmark data unaffected: all 60 thesis_dyn trials show the right plugin loaded
+(45 TgMppiController, 15 stock MPPIController) and zero dlopen failures.
