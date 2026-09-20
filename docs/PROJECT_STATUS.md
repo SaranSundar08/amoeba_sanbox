@@ -3142,3 +3142,32 @@ here because it postdates them.
 Benchmark integrity: all 60 thesis_dyn trials ran 2026-09-17 23:18 -> 2026-09-18 17:40,
 i.e. BEFORE the 23:29 upgrade, on the same stack the snapshot restores. The pending BARN
 static re-run therefore lands on the same stack as the dyn results -- no confound.
+
+## 2026-09-20 -- the Sept 19 winding-distinctness runs are void (broken stack, not the branch)
+
+branch winding-distinctness (764ce21, 09-19 15:22) replaces the synchronized-time side
+test in routesAreDistinct() with T-MPC's winding-number test. Its only robot evaluation,
+st_winding_3rep (09-19 15:47), looked catastrophic: 0/12 legs ok, 11/12 legs with
+contact, min clearance -0.26 m, 11.0 recoveries/leg. DO NOT read that as a verdict on
+the branch. The control run st_winding_check (09-19 15:06) was on e3b6f67-dirty, i.e.
+MAIN, and was equally catastrophic: 0/2 legs, 2/2 contact, -0.155 m, 11.0 recoveries.
+Both ran after the 09-18 23:29 ROS upgrade. Both logs are flooded with 3,240x
+  [ERROR] [tf_help]: Transform data too old when converting
+  [ERROR] [tf_help]: Data time: ..., Transform time: ...
+against ZERO in the pre-upgrade thesis_dyn run, with a byte-identical parameter banner
+(vx_max 1.50, local_costmap 12x12 @ 0.05, soft_distance 0.38, space-time res 0.30/dt
+0.20). The controller could not transform pose/sensor data, so the robot drove blind.
+Cause is the upgraded tf2/nav2 stack, now reverted (see the snapshot entry above).
+Status of the branch: compiles clean (g++ -fsyntax-only, rc=0) and is UNEVALUATED on the
+robot. It must be re-run on the restored stack before any conclusion.
+Caveat found while testing: the new test's PASS_THRESHOLD = 1/(4*pi) means a route that
+passes far from the obstacle accumulates too little winding to count as "passed", so such
+pairs read non-distinct. A 9-case timing-only harness (both routes along y=0, differing
+only in speed) gave old 7/9, new 8/9 -- the new test missed one case at lambda = -0.0685.
+NOTE: the 9-scenario harness cited in amoeba_mathematics_guide.tex sec:spacetime-empirical
+(old test true in only 2/9) is NOT in the repo. That claim is currently unreproducible and
+either the harness must be committed or the number must be softened before submission.
+Consequence for the report: the 96.7% non-distinct rate measured over 25,000 cycles of
+thesis_dyn (B 96.1%, Bp 97.4%, 5.1-5.3 ms/cycle = 27-28% of the cycle) measures the OLD
+test's structural blindness, not route redundancy. It must NOT be written up as "space-time
+search regenerates homotopically duplicate routes".
