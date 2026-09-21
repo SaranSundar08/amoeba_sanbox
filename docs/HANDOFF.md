@@ -56,31 +56,33 @@ The old synchronised-time side test was structurally blind (it needed both route
 the same obstacle at the same time layer; pass-before and pass-behind are near it at
 DIFFERENT layers by construction, so it defaulted to "not distinct"). Replaced on main
 (commit 764ce21) by T-MPC's winding-number test (λ = (1/2π)Σ wrapped Δθ, threshold
-1/(4π)). Re-measured with the WORKING test: 94.1% of feasible space-time routes are
-still homotopically non-distinct (vs 96.7% with the broken test), over 28,000 cycles.
-=> The redundancy is REAL, not an artifact. It is now a defensible finding, because it
-was re-measured with a validated instrument. Cite the 94.1% figure, not 96.7%.
+1/(4π)). The completed corrected run classified 794/12,341 B crossing-trigger pairs
+(6.4%) and 918/12,396 Bp pairs (7.4%) as distinct. State these direct counts rather
+than recycling the obsolete 96.7% figure. Because the finite-route winding threshold
+can still miss far passes, phrase this as the classifier output, not a universal proof
+that the remaining routes are geometrically redundant.
 
 Also void: the Sept 19 runs `st_winding_check` / `st_winding_3rep` (0/12 legs, 11
 recoveries/leg). They ran on the broken tf2 stack — the control on main failed
 identically (6480 `tf_help` errors vs 0 in good runs). Not the branch's fault.
 
-## Results — thesis_dyn_winding (60/60 COMPLETE, corrected test, restored stack)
-legs ok: A 17/40 (43%), B 44/46 (96%), Bp 52/58 (90%), D 53/57 (93%).
-contacts: A 27/40, B 10/46, Bp 14/58, D 9/57. cycle ms: B 19.7, Bp 20.1, D 15.7.
-=> Prediction gives the whole gain over stock. B vs D STILL indistinguishable: topology
-does not separate from prediction even with a working distinctness test, and costs
-~4 ms/cycle. Both thesis_dyn and thesis_dyn_winding agree. NOTE leg denominators differ
-(B 46 vs D 57) — quote percentages, and find out why B produced fewer legs.
+## Results — thesis_dyn_winding (60/60 VALID, corrected test, restored stack)
+Five dyn5 records corrupted by the earlier overlapping runner were rerun individually
+(A rep1/rep2, B rep0/rep1/rep2); all 60 records now contain scored legs, with zero late
+starts or launch/score errors. Planned-leg success: A 17/60, B 54/60, Bp 52/60, D 53/60.
+B versus D: +1.7 success points, 95% cluster-bootstrap CI [-18.3,+23.3], p=1.0;
+speed/clearance/recoveries/contact all non-significant. B cycle time 19.99 ms versus
+D 15.71 ms: +4.28 ms, CI [3.76,4.78], p=3.4e-6. Correct conclusion: prediction gives
+the measured gain over stock; topology is a null result in this benchmark. Report:
+`~/robohouse_ws/benchmark_results/dynamic/thesis_dyn_winding/report.md`.
 
 ## Next
 1. Re-run BARN static (`benchmark_barn.py`) — the only prior run is 14 trials on the
    broken stack, worlds 42/93 only.
-3. Thesis draft: `docs/thesis/main.tex`, IEEEtran journal, double column, 10–12 pp.
-   `\todo{}` = my prose to write, `\pending{}` = awaiting the re-run. `\draftfalse`
-   hides both. Needs: `sudo apt install texlive-latex-recommended texlive-publishers
-   texlive-science texlive-fonts-recommended latexmk`.
-4. Push amoeba_sandbox (6 commits behind origin).
+2. Thesis draft: `docs/thesis/main.tex` now contains the corrected results, MPPI/Biased-MPPI
+   derivation, pipeline figure and algorithms. Remaining placeholders: institution/repository
+   metadata and acknowledgment; then physical SLIP transfer trials when available.
+3. Push amoeba_sandbox (unpublished thesis/doc changes remain).
 
 ## Open honesty items for the report
 - The 9-scenario harness cited in `amoeba_mathematics_guide.tex`

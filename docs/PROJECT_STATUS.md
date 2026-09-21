@@ -1,10 +1,31 @@
 # Amoeba MPPI project status
 
-Last updated: 2026-09-04
+Last updated: 2026-09-20
 
 This file is the durable handoff for future Codex sessions. Read it together
 with `README.md`, `docs/amoeba_mppi_progress.tex`, and the milestone-specific
 ablation notes.
+
+## 2026-09-20 -- thesis_dyn_winding finalized: corrected classifier, null topology result
+
+The 60-file run initially contained five invalid stack-start records caused by the earlier
+overlapping-run incident: dyn5 A rep1/rep2 and B rep0/rep1/rep2. Those five slots were rerun
+individually with the frozen benchmark arguments. All 60 trial records now contain scored legs,
+with zero launch/score errors and zero late starts. The recorded dirty SLIP revision is benign:
+the source diff contains benchmark logs only and no controller/space-time source changes.
+
+Final planned-leg success (60 per condition): A stock 17, B full legacy 54, Bp full equal 52,
+D prediction-only 53. B versus D: success difference +1.7 points, cluster-bootstrap 95% CI
+[-18.3,+23.3], p=1.0; speed p=.696; trial-minimum clearance p=.917; recovery p=.696; contact
+in 10/15 vs 8/15 trials, Fisher p=.710. Cycle time is the clear difference: 19.99 vs 15.71 ms,
++4.28 ms, 95% CI [3.76,4.78], p=3.4e-6. Bp also does not separate from D or B.
+
+Corrected winding diagnostics: B classified 794/12,341 crossing-trigger pairs (6.4%) distinct;
+Bp classified 918/12,396 (7.4%). Logs recorded 14/17 switches into space-time IDs (switches,
+not dwell-cycle shares). Thus distinct alternatives exist and are occasionally selected, but
+topology did not outperform prediction-only MPPI. The thesis conclusion is an honest null
+topology result, not a positive result and not proof of universal ineffectiveness. Never present
+the obsolete 96.7% broken-test figure as route redundancy.
 
 ## Live visualization backend
 

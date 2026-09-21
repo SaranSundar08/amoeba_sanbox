@@ -18,10 +18,29 @@
 }
 
 \newcommand{\R}{\mathbb{R}}
-\newcommand{\F}{\mathcal{F}}
+% Notation revised 2026-09-19 (supervisor review): the original \F and \M
+% collide with standard robotics usage (F = force, M = the mass/inertia
+% matrix M(q) in the rigid-body equations of motion), and the neighbourhood
+% set had been sharing \N with the Gaussian N(mu,Sigma) used throughout the
+% MPPI sections -- an internal clash, not just an external one. Fixed by:
+% \F  (free cells)      -> \Free, rendered Omega (a free/feasible region,
+%                          standard in optimization/motion-planning texts;
+%                          avoids C, already used in Algorithm 1 for the
+%                          raw costmap input).
+% \M  (outward boundary) -> written directly as the topological boundary
+%                          operator applied to \B_rho, i.e. \partial\B_\rho,
+%                          rather than a new letter -- it IS the boundary of
+%                          the flood body, so this is not a notational
+%                          choice, it's the same object under its standard
+%                          name. No new macro needed.
+% \N  (neighbours)       -> kept exclusively for the Gaussian; the 8-cell
+%                          neighbourhood now uses \Adj_8(p) (graph-theoretic
+%                          "adjacency"), typographically distinct (upright,
+%                          not calligraphic) from the Gaussian \N(.,.).
+\newcommand{\Free}{\Omega}
 \newcommand{\B}{\mathcal{B}}
-\newcommand{\M}{\mathcal{M}}
 \newcommand{\N}{\mathcal{N}}
+\newcommand{\Adj}{\operatorname{Adj}}
 \newcommand{\Path}{\mathcal{P}}
 \newcommand{\dist}{\operatorname{dist}}
 \newcommand{\clip}{\operatorname{clip}}
@@ -45,7 +64,9 @@ implementation; they are not a proof of full kinodynamic reachability.
 (For continuity with the accompanying codebase and demonstration videos,
 which predate this terminology, the implementation is internally named
 \texttt{amoeba\_sandbox}; this document uses geometry-first terminology
-throughout.)
+throughout.) Notation follows standard motion-planning/MPC usage rather than
+overloading letters already reserved elsewhere in robotics (e.g.\ force,
+a rigid body's mass matrix); see Section~\ref{sec:notation}.
 \end{abstract}
 
 \tableofcontents
@@ -57,13 +78,13 @@ Let $x_r=(p_r,\theta_r)$ be the robot state, with planar position
 $p_r=[x_r,y_r]^\top$. The construction pipeline computes
 \begin{equation}
 \text{obstacle map}
-\longrightarrow \F
+\longrightarrow \Free
 \longrightarrow \B_\rho(p_r)
-\longrightarrow \M
+\longrightarrow \partial\B_\rho
 \longrightarrow \{P_1,\ldots,P_M\}.
 \end{equation}
-Here $\F$ is collision-free position space, $\B_\rho$ is a local geodesic
-ball, $\M$ is its outward flood boundary, and $P_m$ is one topological-branch
+Here $\Free$ is collision-free position space, $\B_\rho$ is a local geodesic
+ball, $\partial\B_\rho$ is its outward flood boundary, and $P_m$ is one topological-branch
 centreline. The stages answer different questions:
 \begin{description}[leftmargin=3.1cm,style=nextline]
   \item[Body] Which nearby positions are connected to the robot through free
@@ -102,7 +123,7 @@ grid transitions.
 Let $c(p)$ be the Euclidean distance from position $p$ to the nearest
 obstacle. For a circular planning footprint of radius $r_p$, define
 \begin{equation}
-  \F=\{p_{ij}:c(p_{ij})>r_p\}.
+  \Free=\{p_{ij}:c(p_{ij})>r_p\}.
   \label{eq:free}
 \end{equation}
 Equation~\eqref{eq:free} is a configuration-space approximation: obstacles
@@ -142,7 +163,7 @@ For any free cell $p$, define the discrete geodesic distance
   \sum_{e\in\gamma}w(e),
   \label{eq:reach-distance}
 \end{equation}
-where every vertex of path $\gamma$ must lie in $\F$. Dijkstra's algorithm
+where every vertex of path $\gamma$ must lie in $\Free$. Dijkstra's algorithm
 computes Equation~\eqref{eq:reach-distance} from the robot to all locally
 reachable cells:
 \begin{align}
@@ -170,7 +191,7 @@ start-to-goal plan.
 The body is the sublevel set of robot-centred geodesic distance:
 \begin{equation}
   \boxed{
-  \B_\rho(p_r)=\{p\in\F:d_r(p)\leq\rho\}.
+  \B_\rho(p_r)=\{p\in\Free:d_r(p)\leq\rho\}.
   }
   \label{eq:body}
 \end{equation}
@@ -200,7 +221,7 @@ construction is repeated:
   p_r^{(k)}
   \longrightarrow d_r^{(k)}(p)
   \longrightarrow \B_\rho^{(k)}
-  \longrightarrow \M^{(k)}
+  \longrightarrow \partial\B_\rho^{(k)}
   \longrightarrow \{P_m^{(k)}\}.
   \label{eq:moving-rebuild}
 \end{equation}
@@ -215,7 +236,7 @@ The MPPI loop uses the most recently built field between rebuilds.
 
 Figure~\ref{fig:amoeba-motion} is generated from a successful execution of the
 actual sandbox controller in BARN world 48. The pale-blue region is
-$\B_\rho$, cyan points show $\M$, blue arrows show descent of the navigation
+$\B_\rho$, cyan points show $\partial\B_\rho$, blue arrows show descent of the navigation
 value, dotted coloured curves are extracted branch centrelines, the black
 disc is the robot, and red is the already driven trajectory.
 
@@ -242,15 +263,15 @@ geometries later converted into ancillary control sequences.
 
 \section{The outward flood boundary}
 
-Let $\mathcal{N}_8(p)$ denote the eight grid neighbours of $p$. The outward
+Let $\Adj_8(p)$ denote the eight grid neighbours of $p$. The outward
 flood boundary is
 \begin{equation}
   \boxed{
-  \M=
+  \partial\B_\rho=
   \left\{
   p\in\B_\rho:
-  \exists q\in\mathcal{N}_8(p),\quad
-  q\in\F\setminus\B_\rho
+  \exists q\in\Adj_8(p),\quad
+  q\in\Free\setminus\B_\rho
   \right\}.
   }
   \label{eq:membrane}
@@ -263,7 +284,7 @@ boundaries from being mistaken for possible local exits.
 \section{Flood-boundary cost: the ``promise'' value}
 
 When the goal lies outside the local body, the navigation flood cannot be
-seeded directly at the goal. Each $m\in\M$ is instead assigned a terminal
+seeded directly at the goal. Each $m\in\partial\B_\rho$ is instead assigned a terminal
 cost-to-go estimate $h(m)$. ``Promise'' is only an intuitive name: it is a
 heuristic cost, not a guarantee, probability, or reward. Lower is better.
 
@@ -294,16 +315,6 @@ The first term estimates reconnection cost; the second estimates the
 subsequent route to the goal. The global path ranks flood-boundary exits but
 does not replace the true local free-space domain.
 
-\subsection{Small example}
-
-Suppose exits $m_A$ and $m_B$ have
-\begin{align}
-  d_{\mathrm{local}}(p,m_A)&=1.2,&h(m_A)&=6.0,\\
-  d_{\mathrm{local}}(p,m_B)&=2.0,&h(m_B)&=3.5.
-\end{align}
-Their estimated total costs are $7.2$ and $5.5$. Exit $m_B$ is preferred even
-though it is locally farther away, because it offers the better continuation.
-
 \section{Obstacle narrow-channel weight and the navigation field}
 
 Physical reach and navigation preference are deliberately different. Define
@@ -325,7 +336,7 @@ The navigation value inside the body is the multi-source shortest-path field
 \begin{equation}
   \boxed{
   D_g(p)=
-  \min_{m\in\M}
+  \min_{m\in\partial\B_\rho}
   \left[
   h(m)+d_\eta(p,m)
   \right].
@@ -369,7 +380,7 @@ For each endpoint $m_i$, a centreline is traced toward the robot by repeatedly
 moving to a neighbouring cell with lower $d_r$:
 \begin{equation}
   p_{k+1}\in
-  \arg\min_{q\in\mathcal{N}_8(p_k)}d_r(q).
+  \arg\min_{q\in\Adj_8(p_k)}d_r(q).
   \label{eq:backtrace}
 \end{equation}
 After reversing the trace,
@@ -500,56 +511,19 @@ ASSIST. Flow-only retains geodesic cost/bias but sets $\mathcal A_k=\varnothing$
 
 \section{Parallel global-route topology extension}
 
-The local topological branches above describe topology inside one rolling geodesic body.
-The PyTorch reciprocal pilot now adds a second level: several global A* route
-topologies remain active as separate MPPI groups. Repeated penalized A*
-constructs
-\begin{equation}
- \mathcal R=\{R_0,\ldots,R_{K-1}\},
-\end{equation}
-and rejects a candidate when its symmetric mean nearest-point separation from
-an accepted route is below $\epsilon_R$. This is a geometric diversity test,
-not a formal homotopy proof.
-
-Each route is converted into a dynamically constrained mean
-$\mu_{R_k}=\mathcal C(R_k,x_t,u_{t-1})$. The active label set becomes
-\begin{equation}
- \mathcal Z_t=\mathcal R\cup\mathcal A_t\cup\mathcal Y_t\cup\{0\},
- \qquad
- U_n\mid z_n=z\sim\N(\mu_z,\Sigma),
-\end{equation}
-where $\mathcal A_t$ contains local topological branches, $\mathcal Y_t$ contains
-available wait/yield/reverse proposals, and $0$ is the nominal fallback.
-Route-labelled samples receive a tracking cost relative to their own $R_k$,
-not relative to the previously selected route. Conditional free energies
-\begin{equation}
- F_z=-\lambda\log\left[
- \frac{1}{N_z}\sum_{n:z_n=z}\exp\left(-\frac{S_n}{\lambda}\right)
- \right]
-\end{equation}
-are compared with dwell, improvement-margin, and confirmation hysteresis.
-Only the conditional MPPI update of the selected label supplies the command.
-
-The $2.8$\,s local rollout horizon cannot expose a distant head-on conflict.
-For cooperative robots, every candidate route is therefore compared against
-the peer's announced route until the end of the longer remaining route. With
-\begin{equation}
- d_k(t)=\|p_k^a(t)-p^b(t)\|_2,
- \qquad
- e_k(t)=\max(0,r_a+r_b+m_R-d_k(t)),
-\end{equation}
-the implemented route prior is
-\begin{equation}
- J_k^{\mathrm{route\mbox{-}conflict}}
- =w_c\left[
-   \max_t e_k(t)^2+\frac14\operatorname{mean}_t e_k(t)^2
- \right],
- \qquad (v_R,m_R,w_c)=(0.30,0.12,80).
-\end{equation}
-This prior informs the high-level route choice early; detailed collision and
-control feasibility remain the responsibility of short-horizon MPPI. The
-current predictor assumes nominal-speed execution of an announced route.
-Online creation of dynamic space--time classes remains future work.
+Everything above describes topology inside one rolling geodesic body. A
+separate, PyTorch-only exploratory pilot (\texttt{torch\_port}, not the
+sandbox or Nav2 port that produced any validated result in this document)
+extends the same idea one level up: several whole-route global A* topologies
+$\mathcal R=\{R_0,\ldots,R_{K-1}\}$ (rejecting near-duplicates by
+nearest-point separation) run as separate MPPI groups, each with its own
+free energy $F_z$ under the same committed-mode selection rule as
+Equation~\eqref{eq:frozen-mode-evidence}, plus a long-horizon route-conflict
+prior for two cooperating robots comparing announced routes beyond the
+$2.8\,$s local rollout horizon. This is real, implemented, geometric-diversity
+work, but it is a separate research thread, not part of the single-robot
+static or dynamic-obstacle results elsewhere in this document, and is not
+detailed further here.
 
 \subsection{Current Nav2 Phase~3 realization}
 
@@ -588,17 +562,87 @@ Every construction above floods free \emph{space}: a topological branch or
 global route is a curve through $\R^2$, and two curves are treated as distinct when
 an obstacle separates them at every shared point. A moving obstacle is not
 representable this way. It only enters through the MPPI cost as a
-time-indexed clearance term (\texttt{mppi.py}'s V6.1 prediction layer,
-documented in the companion progress notes,
-\texttt{docs/amoeba\_mppi\_progress.tex}), so ``wait for it to pass'' and
-``go before it arrives'' are never offered as candidate means $\mu_m$ --
-they must be discovered by sampling noise around whichever single branch
-mean already exists. This section formalizes flooding free
-\emph{space-time} instead, so a predicted obstacle's swept path becomes a
-tube that separates routes the same way a pillar does. This is the
-implemented mechanism (\texttt{spacetime.py}), not yet integrated with the
-geodesic body $\B_\rho$ above or the global-route extension $\mathcal R$: it
-operates on one topological branch or path reference at a time.
+time-indexed clearance term -- the sandbox's own \texttt{mppi.py} V6.1
+prediction layer (documented in the companion progress notes,
+\texttt{docs/amoeba\_mppi\_progress.tex}) and, in the live Nav2 port, the
+\texttt{DynamicObstacleCritic} formalized in
+Section~\ref{sec:dynamic-obstacle-cost} below -- so ``wait for it to pass''
+and ``go before it arrives'' are never offered as candidate means $\mu_m$ by
+that cost term alone; they must be discovered by sampling noise around
+whichever single branch mean already exists, or supplied explicitly as extra
+modes by the space-time search this section formalizes. This section
+formalizes flooding free \emph{space-time} instead, so a predicted
+obstacle's swept path becomes a tube that separates routes the same way a
+pillar does. This is the implemented mechanism (\texttt{spacetime.py} in the
+sandbox, \texttt{tools/space\_time\_search.cpp} in the Nav2 port), not yet
+integrated with the geodesic body $\B_\rho$ above or the global-route
+extension $\mathcal R$: it operates on one topological branch or path
+reference at a time.
+
+\subsection{Predicted-obstacle collision cost (Nav2 port)}
+\label{sec:dynamic-obstacle-cost}
+
+This is the per-rollout-point term that actually keeps the controller clear
+of moving obstacles; the space-time construction that follows only
+\emph{proposes} extra candidate means, it does not itself avoid anything
+(Section~\ref{sec:spacetime-empirical} makes this distinction precise, with
+measurements). It
+is a direct MPPI-cost restatement of the dynamic-obstacle constraint in de
+Groot, Ferranti, Gavrila and Alonso-Mora, ``Topology-Driven Parallel
+Trajectory Optimization in Dynamic Environments'' (T-MPC), \emph{RA-L}
+(their Eq.~2d/14): a hard per-timestep constraint there becomes a soft
+per-rollout-point cost here, so it composes with MPPI's Monte-Carlo cost
+accumulation instead of a gradient-based constrained optimizer. \textbf{This
+term's formulation is not original to this project}; the contribution, such
+as it is, is the restatement and the Nav2/xtensor implementation
+(\texttt{tools/dynamic\_obstacle\_cost.hpp},
+\texttt{critics/DynamicObstacleCritic}).
+
+For rollout $i$, point $j=1,\ldots,T$ reached after $j$ controls, let
+$t_j=\min(j\,\Delta t,\,T_{\max})$ be that point's time-since-now under the
+model's own step $\Delta t$ (a clamp, not a physical cutoff: the constant-
+velocity estimate is simply not trusted past $T_{\max}$). The footprint is
+represented as two discs, offset $\pm\delta$ along the rollout's heading
+$\psi_j$ from the robot centre, each of radius $r_f$ (fit to the
+$0.84\times0.68\,$m rectangle: $\delta=0.21\,$m, $r_f=\sqrt{0.21^2+0.34^2}
+\approx0.40\,$m). For tracked obstacle $k$ with position $o_k$, velocity
+$v_k$ (constant-velocity extrapolation, Equation~\eqref{eq:spacetime-free}'s
+$\hat o(\tau)$ specialized to this critic's own $t_j$), and radius $r_k$,
+the signed clearance of disc offset $\epsilon\in\{+\delta,-\delta\}$ is
+\begin{equation}
+  d_{j,k,\epsilon}=
+  \bigl\lVert\, p_j+\epsilon\,[\cos\psi_j,\sin\psi_j]-(o_k+v_k t_j)\,\bigr\rVert_2
+  -(r_f+r_k),
+  \label{eq:dynobs-clearance}
+\end{equation}
+and $d_j=\min_{k,\epsilon}d_{j,k,\epsilon}$ the worst clearance at that point
+over every tracked obstacle and both discs. Per-point cost is
+\begin{equation}
+  c(d_j)=
+  \begin{cases}
+    c_{\mathrm{coll}}+c_{\mathrm{pen}}\,\lvert d_j\rvert, & d_j<0,\\[4pt]
+    c_{\mathrm{crit}}\left(\dfrac{d_{\mathrm{soft}}-d_j}{d_{\mathrm{soft}}}\right)^{2}, & 0\le d_j<d_{\mathrm{soft}},\\[6pt]
+    0, & d_j\ge d_{\mathrm{soft}},
+  \end{cases}
+  \label{eq:dynobs-cost}
+\end{equation}
+a quadratic repulsive band inside $d_{\mathrm{soft}}$ and a large fixed
+penetration cost \emph{plus} a term proportional to overlap depth once
+already colliding -- graded, not flagged infeasible and discarded, so among
+several already-bad rollouts MPPI's softmax still prefers the least
+penetrating one (the ``least-bad escape'' the header comment names it) --
+and the rollout's total dynamic-obstacle cost is
+\begin{equation}
+  J_{\mathrm{dyn}}(i)=w_{\mathrm{dyn}}\left(\frac{1}{T}\sum_{j=1}^{T}c(d_j)\right)^{p},
+  \label{eq:dynobs-total}
+\end{equation}
+added into the same cost sum every other critic contributes to before the
+softmax weighting of Equation~\eqref{eq:frozen-selected-update} (or its
+un-mixed single-mode equivalent when grouped sampling is off). Defaults:
+$d_{\mathrm{soft}}=0.5\,$m (speed-scaled to the braking distance
+$v_{\max}^2/2a$ at higher $v_{\max}$), $c_{\mathrm{crit}}=300$,
+$c_{\mathrm{coll}}=10^6$, $c_{\mathrm{pen}}=10^4$, $w_{\mathrm{dyn}}=3.81$,
+$p=1$.
 
 \subsection{Time-expanded state space}
 
@@ -607,7 +651,7 @@ own spatial resolution, generally coarser than the flood's $\Delta r$. A
 state is a triple $(p,k)$, position $p\in\R^2$ at discrete time
 $\tau_k=k\Delta t_\ell$, $k=0,\ldots,K$, $K=\lfloor T_s/\Delta t_\ell\rfloor$
 for search horizon $T_s$. Transitions advance exactly one layer: an ordinary
-move $(p,k)\to(q,k+1)$ for $q\in\N_8(p)$, or a \emph{wait}
+move $(p,k)\to(q,k+1)$ for $q\in\Adj_8(p)$, or a \emph{wait}
 $(p,k)\to(p,k+1)$. Because every transition advances $k$ by one regardless of
 whether $p$ changes, waiting costs real time exactly as moving does -- this
 is what lets ``wait'' be a genuine competing strategy rather than a free
@@ -644,16 +688,14 @@ and a path's cost is $\sum_k c(p_k,p_{k+1})$. The cheapest feasible path is
 found by Dijkstra over $(p,k)$ exactly as in Equation~\eqref{eq:reach-distance},
 now with the extra time coordinate.
 
-A first implementation attempted to build two distinct routes by bounding
-\emph{which} layer counts as arrival -- an early deadline
-$k\le k_{\max}$ or a late one $k\ge k_{\min}$. This degenerates: if reaching
-the goal safely is possible well before $k_{\min}$, the cheapest way to
-satisfy a late deadline is simply to arrive early and idle at the goal --
-physically the same route, wrongly labelled distinct. A deadline changes
-which path \emph{qualifies}, not which one is cheapest.
-
-Varying the wait cost $c_w$ changes which path \emph{is} cheapest, so it does
-not degenerate this way. Solving Equation~\eqref{eq:spacetime-step-cost} twice,
+Bounding \emph{which} layer counts as arrival (an early deadline
+$k\le k_{\max}$ vs.\ a late one $k\ge k_{\min}$) was tried and rejected: it
+degenerates whenever reaching the goal safely is possible well before
+$k_{\min}$, since the cheapest way to satisfy a late deadline is then simply
+to arrive early and idle, physically the same route wrongly labelled
+distinct. A deadline changes which path \emph{qualifies}, not which one is
+cheapest. Varying the wait cost $c_w$ changes which path \emph{is} cheapest,
+so it does not degenerate this way. Solving Equation~\eqref{eq:spacetime-step-cost} twice,
 once with $c_w=c_w^{\text{cheap}}$ (waiting favoured) and once with
 $c_w=c_w^{\text{expensive}}$ (moving favoured, so a lateral detour becomes
 the cheaper way to avoid the same obstacle), gives
@@ -700,6 +742,56 @@ procedurally different (one holds position, the other does not), so
 $\{\pi_{\mathrm{wait}},\pi_{\mathrm{detour}}\}$ are offered as candidate
 modes on feasibility alone, never gated on Equation~\eqref{eq:spacetime-distinct}.
 
+\subsection{Empirical distinctness rate and root cause}
+\label{sec:spacetime-empirical}
+
+The diagnostic caveat above understates the problem. Live Nav2 measurement
+(15 dynamic-scenario trials, $\approx$11{,}000 crossing detections) found
+Equation~\eqref{eq:spacetime-distinct} true in only a few dozen cases: about
+96\% of detections were flagged non-distinct, and a standalone synthetic
+harness (head-on crossings at three lateral offsets and three obstacle
+speeds, both searches genuinely feasible in 9/9) found the equation true in
+only 2/9. Widening $r_{\mathrm{rel}}$ recovered almost none of the rest
+(5/9 stayed non-distinct even at $1.6\,$m).
+
+This is not sampling noise; it is what
+Equation~\eqref{eq:spacetime-distinct} actually asks. A pass-before route and
+a pass-behind route are close to the obstacle at \emph{different} layers $k$
+by construction -- one crosses the obstacle's line of motion before it
+arrives, the other after it has gone -- so at any single shared layer
+\emph{usually only one} route satisfies $\lVert d_a\rVert_2\le r_{\mathrm{rel}}$
+or $\lVert d_b\rVert_2\le r_{\mathrm{rel}}$, and
+Equation~\eqref{eq:spacetime-distinct} is vacuously unevaluated at every
+other layer. The test is structurally blind to exactly the distinction it
+exists to detect: it asks whether two routes are on opposite sides of the
+obstacle \emph{at the same time}, when the thing that actually separates a
+wait route from a detour route is which side of the obstacle's line of
+motion each route occupies at \emph{its own} crossing moment -- a
+\emph{crossing-order} invariant, the space-time analogue of a winding
+number, not a synchronized-side test. A corrected test would label each
+route independently at its own closest-approach layer $k^\star_a$
+(respectively $k^\star_b$) by the sign of
+$\bigl(p_{a,k^\star_a}-\hat o(\tau_{k^\star_a})\bigr)\cdot v_o$ (projection
+onto the obstacle's own velocity: positive means the obstacle has not yet
+reached that point, negative means it already has) and declare the routes
+distinct when the two signs differ -- not attempted here, filed as the
+concrete fix candidate.
+
+A second, independent cause compounds the first even when a distinct pair
+\emph{is} found: the grouped-sampling selection of Equation~\eqref{eq:mixture}
+is winner-takes-all across groups, and a proposal group's expected free-energy
+minimum scales as $-\sigma\sqrt{2\ln N}$ in its own sample count $N$. At the
+Nav2 port's default allocation (fallback $N\approx1600$ against
+$N\approx80$--$130$ per active mode) the unbiased fallback wins by roughly
+$0.9\sigma$ of sample-count advantage alone -- above the $0.3\sigma$ switch
+margin -- so even a genuinely distinct, genuinely better proposal can lose
+the softmax purely to being outnumbered, independent of whether it is
+correct. Giving every active group (including the fallback) a near-equal
+share of the batch, which is the sandbox's own default allocation rule and
+an opt-in parameter in the port (\texttt{tgmppi\_group\_allocation:equal}),
+removes this term, but was not observed to change the live outcome
+materially on its own -- consistent with the first cause dominating.
+
 \subsection{Trigger and local goal}
 
 Recomputing Equation~\eqref{eq:two-route} every cycle for every branch is
@@ -726,9 +818,9 @@ centreline. Two evaluation windows -- the check trajectory here fixed at
 $v_s$, the search grid also implied speed $v_s$ -- must agree, or a goal
 picked as ``reachable'' or a crossing checked over the wrong horizon each
 silently return \emph{infeasible} or \emph{no trigger} for a reason that has
-nothing to do with the obstacle. Both failure modes were found empirically
-(the first goal-reachability mismatch, the first trigger window mismatch)
-before the mechanism ever produced a route.
+nothing to do with the obstacle -- both were real bugs found before the
+mechanism ever produced a route, and are why the two windows are stated
+here as a matching requirement rather than left implicit.
 
 \subsection{Extending the proposal set}
 
@@ -759,12 +851,31 @@ confirmation hysteresis, with no special-casing.
 Implemented for one topological branch against one predicted obstacle at a
 time: several simultaneous obstacles collapse to the single worst one in
 Equation~\eqref{eq:spacetime-trigger}, and the path fallback does not yet
-receive a space-time alternative. Verified on synthetic scenarios and, with
-default oscillating-obstacle settings, on real BARN worlds (dozens of
-triggers and added modes over a short episode on several development
-worlds); not yet validated against the existing dynamic-scenario benchmarks
-(V6.1/V7.1, \texttt{docs/amoeba\_mppi\_progress.tex}), which is required
-before any performance claim.
+receive a space-time alternative.
+
+\textbf{Now validated against a scripted dynamic-obstacle benchmark}
+(\texttt{thesis\_dyn}: 5 open-room worlds $\times$ 3 conditions $\times$ 3
+reps at 0.3--1.0\,m/s obstacles; \texttt{thesis\_dyn\_fast}: 2 worlds at
+human-walking-pace 1.2--1.4\,m/s obstacles). The honest result: full TG-MPPI
+(with the space-time and pseudopod mechanisms of this section and
+Section~\ref{sec:centreline-topology} both active) is statistically
+indistinguishable from Section~\ref{sec:dynamic-obstacle-cost}'s
+predicted-obstacle collision cost run alone, on legs completed, contact
+rate, clearance, and speed (Spearman/Fisher tests, $p=0.08$--$1.0$ across
+metrics at $n=15$--$21$ per condition), while either configuration beats
+stock Nav2 MPPI overwhelmingly ($p<10^{-7}$). Consistent with
+Section~\ref{sec:spacetime-empirical}: space-time selections occurred in
+only 12--17 of $\approx$11{,}000 detections across the run. The gain over
+stock in dynamic scenes is attributable to
+Equation~\eqref{eq:dynobs-total} alone, not to this section's guidance
+mechanism, in open-room scenes of this kind. This mirrors the static-BARN
+finding of Section~\ref{sec:centreline-topology} exactly: branch selection
+measured $0.000$ across the ten-world static generality matrix there too --
+the pseudopod/space-time guidance layer is validated as \emph{correct and
+inert} in both settings tested to date, not yet as improving anything, and
+its demonstrated value (the blocked-path McNemar result, $9/10$ vs $2/10$,
+$p=0.0156$) lives specifically in the locally-blocked-path regime, which
+neither of these Gazebo benchmarks reproduces.
 
 \section{Topology-guided biased MPPI algorithm}
 
@@ -784,22 +895,22 @@ combining all modes in one Nav2 update.
 global path $\Path$, reach $\rho$, footprint proxy $r_p$, batch size $N$,
 horizon $T$, ancillary fraction $\alpha_a$, promise temperature $\tau_p$
 \Ensure Applied control $u_0^*$
-\State $\F \gets \{p\in C:c(p)>r_p\}$
-\State $d_r \gets \Call{Dijkstra}{p_r,\F,w}$
-\State $\B_\rho \gets \{p\in\F:d_r(p)\leq\rho\}$
-\State $\M \gets \{p\in\B_\rho:\N_8(p)\cap(\F\setminus\B_\rho)\neq\varnothing\}$
-\ForAll{$m\in\M$}
+\State $\Free \gets \{p\in C:c(p)>r_p\}$
+\State $d_r \gets \Call{Dijkstra}{p_r,\Free,w}$
+\State $\B_\rho \gets \{p\in\Free:d_r(p)\leq\rho\}$
+\State $\partial\B_\rho \gets \{p\in\B_\rho:\Adj_8(p)\cap(\Free\setminus\B_\rho)\neq\varnothing\}$
+\ForAll{$m\in\partial\B_\rho$}
   \State $h(m)\gets\displaystyle\min_{z_k\in\Path}
   \bigl(\lVert m-z_k\rVert_2+L_{\mathrm{rem}}(z_k)\bigr)$
 \EndFor
 \State $\eta(p)\gets 1+\alpha_\eta\,
 \clip\!\left(1-\dfrac{c(p)-r_p}{b},0,1\right)$, $\forall p\in\B_\rho$
-\State $D_g(p)\gets\displaystyle\min_{m\in\M}
+\State $D_g(p)\gets\displaystyle\min_{m\in\partial\B_\rho}
 \left[h(m)+d_\eta(p,m)\right]$, $\forall p\in\B_\rho$
-\State $\mathcal E\gets\Call{NMS}{\operatorname{sort}_{m\in\M}
+\State $\mathcal E\gets\Call{NMS}{\operatorname{sort}_{m\in\partial\B_\rho}
 \left(D_g(m)+d_r(m)\right)}$
 \State $\{P_m\}_{m=1}^{M}\gets
-\Call{DistinctBacktraces}{\mathcal E,d_r,\F}$, $M\leq3$
+\Call{DistinctBacktraces}{\mathcal E,d_r,\Free}$, $M\leq3$
 \For{$m=1,\ldots,M$}
   \State $\mu_m\gets\Call{ProjectConstraints}{\mathcal A(P_m,x_r,T)}$
   \State $X_m\gets\Call{Rollout}{x_r,\mu_m}$
@@ -832,6 +943,7 @@ footprint-rejection line is included as the mathematically required gate; its
 complete integration into the current Nav2 port remains pending.
 
 \section{Notation summary}
+\label{sec:notation}
 
 \begin{table}[h]
 \centering
@@ -843,10 +955,13 @@ $\Delta r$ & Grid resolution; currently $0.05\,\mathrm{m}$. \\
 $r_p$ & Circular planning-footprint proxy. \\
 $\rho$ & Geodesic flood reach; commonly $2.5\,\mathrm{m}$. \\
 $c(p)$ & Clearance from position $p$ to the nearest obstacle. \\
-$\F$ & Collision-free grid cells. \\
+$\Free$ & Collision-free grid cells. \\
 $d_r(p)$ & Plain geodesic distance from the robot. \\
 $\B_\rho$ & Flood body, the $\rho$-sublevel set of $d_r$. \\
-$\M$ & Outward flood boundary where the geodesic budget expires. \\
+$\Adj_8(p)$ & The 8-connected grid neighbours of $p$ (graph adjacency; kept
+typographically distinct from the Gaussian $\N(\cdot,\cdot)$ below). \\
+$\partial\B_\rho$ & Outward flood boundary where the geodesic budget expires
+-- the topological boundary of $\B_\rho$, not a separate symbol. \\
 $h(m)$ & Flood-boundary terminal cost-to-go estimate (``promise''). \\
 $\eta(p)$ & Obstacle-dependent narrow-channel weight. \\
 $D_g(p)$ & Narrow-channel-weighted navigation value inside the body. \\
@@ -877,32 +992,5 @@ $J_k^{\mathrm{route\mbox{-}conflict}}$ & Long-horizon cooperative conflict prior
   \item Geometric reachability is checked first; control and footprint
   feasibility are checked when generating the ancillary sequence.
 \end{enumerate}
-
-\section{Compact derivation}
-
-The complete flood-to-proposal construction can be summarized as
-\begin{align}
-  \F
-  &=\{p:c(p)>r_p\},\\
-  d_r(p)
-  &=\min_{\gamma:p_r\leadsto p}\sum_{e\in\gamma}w(e),\\
-  \B_\rho
-  &=\{p\in\F:d_r(p)\leq\rho\},\\
-  \M
-  &=\{p\in\B_\rho:\mathcal N_8(p)\cap
-      (\F\setminus\B_\rho)\ne\varnothing\},\\
-  D_g(p)
-  &=\min_{m\in\M}\left[h(m)+d_\eta(p,m)\right],\\
-  \{P_m\}_{m=1}^{M}
-  &=\operatorname{DistinctBacktraces}(\M,D_g,d_r),\\
-  \mu_m
-  &=\mathcal A(P_m,x_0),\\
-  q(U)
-  &=\sum_{m=0}^{M}\pi_m\N(U;\mu_m,\Sigma_m),\\
-  m^*
-  &=\operatorname{Commit}\!\left(\arg\min_m F_m\right),\\
-  U^*
-  &=\sum_{i:z_i=m^*}w_{i\mid m^*}U_i.
-\end{align}
 
 \end{document}
