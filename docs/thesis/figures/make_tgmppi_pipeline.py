@@ -68,7 +68,7 @@ box(ax, (0.455, 0.16), 0.225, 0.71, "#318a52", "2  Grouped MPPI", [
     "free energy $F_m$",
 ])
 
-box(ax, (0.725, 0.16), 0.225, 0.71, "#bd3f3f", "3  Decision \& execution", [
+box(ax, (0.725, 0.16), 0.225, 0.71, "#bd3f3f", "3  Decision & execution", [
     "$m^*=\\arg\\min_m F_m$",
     "dwell + switch margin",
     "multi-cycle confirmation",

@@ -1,86 +1,136 @@
 \relax 
+\@writefile{toc}{\contentsline {section}{\numberline {I}Introduction}{1}{}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Motivating snapshot of sampled MPPI rollouts (green), a nominal route (blue/grey), and pseudopod-derived guidance (magenta). The image illustrates route-conditioned sampling and is not a quantitative result.}}{1}{}\protected@file@percent }
+\newlabel{fig:trajectory-motivation}{{1}{1}}
+\citation{fox1997dwa}
+\citation{roesmann2017teb}
 \citation{williams2017mppi}
 \citation{williams2018mppi}
-\citation{fox1997dwa}
+\citation{mandow2007skidsteer}
+\citation{vlahov2024lowfrequency}
+\citation{kim2022smooth}
+\citation{mohamed2022logmppi}
+\citation{gandhi2021robust}
+\citation{aldrich2025soppi}
 \citation{trevisan2024biased}
-\@writefile{toc}{\contentsline {section}{\numberline {I}Introduction}{1}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {II}Related Work}{1}{}\protected@file@percent }
 \citation{bhattacharya2012hsignature}
 \citation{roesmann2017teb}
+\@writefile{toc}{\contentsline {section}{\numberline {II}Related Work}{2}{}\protected@file@percent }
 \citation{degroot2025tmpc}
 \citation{macenski2023nav2}
 \citation{williams2017mppi}
 \citation{williams2018mppi}
 \citation{trevisan2024biased}
-\@writefile{toc}{\contentsline {section}{\numberline {III}Background and Problem Formulation}{2}{}\protected@file@percent }
-\newlabel{sec:problem}{{III}{2}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-A}}Information-theoretic stochastic control}{2}{}\protected@file@percent }
-\newlabel{eq:trajectory-cost}{{1}{2}}
-\newlabel{eq:free-energy-objective}{{2}{2}}
-\newlabel{eq:optimal-control-distribution}{{4}{2}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-B}}Classical MPPI}{2}{}\protected@file@percent }
-\newlabel{eq:mppi}{{7}{2}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-C}}Biased MPPI and ancillary controllers}{2}{}\protected@file@percent }
-\newlabel{eq:biased-mppi-weight}{{8}{2}}
-\newlabel{eq:biased-mppi-update}{{9}{2}}
-\newlabel{eq:biased-mixture}{{10}{2}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-D}}Multimodal failure addressed by TG-MPPI}{3}{}\protected@file@percent }
-\newlabel{eq:grouped-objective}{{11}{3}}
-\@writefile{toc}{\contentsline {section}{\numberline {IV}Method: TG-MPPI}{3}{}\protected@file@percent }
-\newlabel{sec:method}{{IV}{3}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-A}}Geodesic flood field and the robot-centred body}{3}{}\protected@file@percent }
-\newlabel{eq:local-geodesic}{{12}{3}}
-\newlabel{eq:geodesic-body}{{13}{3}}
-\newlabel{eq:membrane-short}{{14}{3}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-B}}Pseudopod branches as guidance trajectories}{3}{}\protected@file@percent }
-\newlabel{eq:promise-short}{{15}{3}}
-\newlabel{eq:navigation-short}{{16}{3}}
-\newlabel{eq:ancillary-short}{{17}{3}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-C}}Grouped sampling and per-group free energy}{3}{}\protected@file@percent }
-\newlabel{eq:freeenergy}{{18}{3}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-D}}Space-time routes}{3}{}\protected@file@percent }
-\newlabel{eq:cv-prediction}{{19}{3}}
+\citation{williams2017mppi}
+\citation{williams2018mppi}
+\citation{trevisan2024biased}
+\@writefile{toc}{\contentsline {section}{\numberline {III}Background and Problem Formulation}{3}{}\protected@file@percent }
+\newlabel{sec:problem}{{III}{3}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-A}}Information-theoretic stochastic control}{3}{}\protected@file@percent }
+\newlabel{eq:trajectory-cost}{{1}{3}}
+\newlabel{eq:free-energy-objective}{{2}{3}}
+\newlabel{eq:optimal-control-distribution}{{4}{3}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-B}}Classical MPPI}{3}{}\protected@file@percent }
+\newlabel{eq:mppi}{{7}{3}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-C}}Biased MPPI and ancillary controllers}{3}{}\protected@file@percent }
+\newlabel{eq:biased-mppi-weight}{{8}{3}}
+\newlabel{eq:biased-mppi-update}{{9}{3}}
+\newlabel{eq:biased-mixture}{{10}{3}}
+\@writefile{lot}{\contentsline {table}{\numberline {I}{\ignorespaces Notation. Symbols follow standard information-theoretic MPC usage \cite  {williams2017mppi,williams2018mppi,trevisan2024biased} where a robotics-standard choice exists; problem-specific symbols are defined once, here and at first use, and are not reused for anything else in this paper.}}{4}{}\protected@file@percent }
+\newlabel{tab:notation}{{I}{4}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-D}}Multimodal failure addressed by TG-MPPI}{4}{}\protected@file@percent }
+\newlabel{eq:grouped-objective}{{11}{4}}
+\@writefile{toc}{\contentsline {section}{\numberline {IV}Method: TG-MPPI}{4}{}\protected@file@percent }
+\newlabel{sec:method}{{IV}{4}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-A}}Geodesic flood field and the robot-centred body}{4}{}\protected@file@percent }
+\newlabel{eq:local-geodesic}{{12}{4}}
+\newlabel{eq:geodesic-body}{{13}{4}}
+\newlabel{eq:membrane-short}{{14}{4}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-B}}Pseudopod branches as guidance trajectories}{4}{}\protected@file@percent }
+\newlabel{eq:promise-short}{{15}{4}}
+\newlabel{eq:navigation-short}{{16}{4}}
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces TG-MPPI architecture. Robot state, local geometry, the Nav2 global path and predicted obstacle motion generate collision-validated spatial and space--time ancillary means. Separate MPPI sample groups are rolled out and scored by the common critic set. A committed-mode decision selects one conditional update, whose first command is executed before replanning.}}{5}{}\protected@file@percent }
+\newlabel{fig:pipeline}{{2}{5}}
+\newlabel{eq:ancillary-short}{{17}{5}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-C}}Grouped sampling and per-group free energy}{5}{}\protected@file@percent }
+\newlabel{eq:freeenergy}{{18}{5}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-D}}Space-time routes}{5}{}\protected@file@percent }
+\newlabel{eq:cv-prediction}{{19}{5}}
+\newlabel{eq:spacetime-free-short}{{20}{5}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Sandbox execution in BARN world 48. The geodesic body (blue), membrane (cyan), navigation directions (arrows), retained pseudopods (dotted curves) and driven trace (red) are shown at three field rebuilds. This is an implementation-derived explanatory visual, not a scored Nav2 benchmark trial.}}{6}{}\protected@file@percent }
+\newlabel{fig:amoeba-motion}{{3}{6}}
+\@writefile{loa}{\contentsline {algorithm}{\numberline {1}{\ignorespaces Topology-Guided Grouped MPPI}}{6}{}\protected@file@percent }
+\newlabel{alg:tgmppi}{{1}{6}}
+\@writefile{loa}{\contentsline {algorithm}{\numberline {2}{\ignorespaces Space--Time Alternative Generation}}{6}{}\protected@file@percent }
+\newlabel{alg:spacetime}{{2}{6}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-E}}Homotopy distinctness}{6}{}\protected@file@percent }
+\newlabel{sec:method-distinct}{{\mbox  {IV-E}}{6}}
 \citation{degroot2025tmpc}
 \citation{bhattacharya2012hsignature}
-\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Sandbox execution in BARN world 48. The geodesic body (blue), membrane (cyan), navigation directions (arrows), retained pseudopods (dotted curves) and driven trace (red) are shown at three field rebuilds. This is an implementation-derived explanatory visual, not a scored Nav2 benchmark trial.}}{4}{}\protected@file@percent }
-\newlabel{fig:amoeba-motion}{{1}{4}}
-\newlabel{eq:spacetime-free-short}{{20}{4}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-E}}Homotopy distinctness}{4}{}\protected@file@percent }
-\newlabel{sec:method-distinct}{{\mbox  {IV-E}}{4}}
-\newlabel{eq:winding}{{21}{4}}
-\@writefile{toc}{\contentsline {section}{\numberline {V}Implementation}{4}{}\protected@file@percent }
-\newlabel{sec:impl}{{V}{4}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-A}}Development sandbox and transfer to Nav2}{4}{}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Synthetic sandbox demonstration of space--time topology. Left: plan view of wait and detour candidates around a moving obstacle. Right: the same candidates in $(x,y,t)$, where the obstacle trajectory forms an exclusion tube. The diagram explains the proposal mechanism; quantitative claims are drawn only from the Gazebo benchmark.}}{5}{}\protected@file@percent }
-\newlabel{fig:spacetime-topology}{{2}{5}}
-\@writefile{toc}{\contentsline {section}{\numberline {VI}Experimental Setup}{5}{}\protected@file@percent }
-\newlabel{sec:setup}{{VI}{5}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VI-A}}Robot and simulator}{5}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VI-B}}Scenarios}{5}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VI-C}}Conditions}{5}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VI-D}}Protocol and metrics}{5}{}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Benchmark start pose, goal poses and obstacle tracks for \texttt  {dyn1}--\texttt  {dyn5} over the occupancy map used in all trials.}}{6}{}\protected@file@percent }
-\newlabel{fig:route}{{3}{6}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VI-E}}Physical SLIP validation plan}{6}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {VII}Results}{6}{}\protected@file@percent }
-\newlabel{sec:results}{{VII}{6}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VII-A}}Prediction accounts for the gain over the baseline}{6}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VII-B}}Topology relative to prediction}{6}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VII-C}}Space-time distinctness}{6}{}\protected@file@percent }
-\newlabel{sec:distinctness}{{\mbox  {VII-C}}{6}}
-\@writefile{toc}{\contentsline {section}{\numberline {VIII}Discussion and Limitations}{6}{}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Synthetic sandbox demonstration of space--time topology. Left: plan view of wait and detour candidates around a moving obstacle. Right: the same candidates in $(x,y,t)$, where the obstacle trajectory forms an exclusion tube. The diagram explains the proposal mechanism; quantitative claims are drawn only from the Gazebo benchmark.}}{7}{}\protected@file@percent }
+\newlabel{fig:spacetime-topology}{{4}{7}}
+\newlabel{eq:winding}{{21}{7}}
+\@writefile{toc}{\contentsline {section}{\numberline {V}Implementation}{7}{}\protected@file@percent }
+\newlabel{sec:impl}{{V}{7}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-A}}SLIP platform and digital representation}{7}{}\protected@file@percent }
+\newlabel{sec:slip-platform}{{\mbox  {V-A}}{7}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-B}}Development sandbox and transfer to Nav2}{8}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {VI}Experimental Setup}{8}{}\protected@file@percent }
+\newlabel{sec:setup}{{VI}{8}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VI-A}}Robot and simulator}{8}{}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {II}{\ignorespaces System parameters used in the reported Nav2/Gazebo experiments (Table\nobreakspace  {}V\hbox {}, VI\hbox {}), read from the deployed controller configuration. Values that vary by design across an experiment (e.g.\ $v_{x,\qopname  \relax m{max}}$ under the dynamic-obstacle command-speed override, described in Section\nobreakspace  {}VI\hbox {}) are reported there instead of here.}}{8}{}\protected@file@percent }
+\newlabel{tab:params}{{II}{8}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VI-B}}Scenarios}{8}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VI-C}}Conditions}{8}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VI-D}}Protocol and metrics}{8}{}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces Benchmark start pose, goal poses and obstacle tracks for \texttt  {dyn1}--\texttt  {dyn5} over the occupancy map used in all trials.}}{9}{}\protected@file@percent }
+\newlabel{fig:route}{{5}{9}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VI-E}}Reference-sandbox protocol}{9}{}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {III}{\ignorespaces PyTorch sandbox static matrix: 10 BARN worlds, five matched seeds per world. Clearance is averaged over successful runs.}}{9}{}\protected@file@percent }
+\newlabel{tab:sandbox-static}{{III}{9}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VI-F}}Physical SLIP validation plan}{9}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {VII}Results}{9}{}\protected@file@percent }
+\newlabel{sec:results}{{VII}{9}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VII-A}}Reference-sandbox results}{9}{}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces Success and clearance in the frozen sandbox static matrix. This is analytical-SLIP reference evidence, not a Gazebo/Nav2 result.}}{10}{}\protected@file@percent }
+\newlabel{fig:sandbox-static}{{6}{10}}
+\@writefile{lot}{\contentsline {table}{\numberline {IV}{\ignorespaces Paired sandbox blocked-path attribution over ten seeds.}}{10}{}\protected@file@percent }
+\newlabel{tab:sandbox-blocked}{{IV}{10}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VII-B}}Nav2/Gazebo dynamic benchmark}{10}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {\mbox  {VII-B}1}Prediction accounts for the gain over the baseline}{10}{}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces Blocked-path sandbox ablation. Disabling pseudopod proposals while retaining geodesic flow sharply reduced completion and clearance.}}{10}{}\protected@file@percent }
+\newlabel{fig:sandbox-blocked}{{7}{10}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {\mbox  {VII-B}2}Topology does not separate from prediction}{10}{}\protected@file@percent }
+\newlabel{sec:distinctness}{{\mbox  {VII-B}3}{10}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {\mbox  {VII-B}3}Space-time distinctness}{10}{}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {V}{\ignorespaces Corrected-winding dynamic benchmark: 60 trials (15 per condition, four planned legs each). Legs ok uses all 60 planned legs per condition; contacts and continuous metrics use attempted legs because a trial stops after two consecutive failures. Values are mean $\pm $ standard deviation.}}{11}{}\protected@file@percent }
+\newlabel{tab:main}{{V}{11}}
+\@writefile{lot}{\contentsline {table}{\numberline {VI}{\ignorespaces Legs completed by obstacle density (10/15/20 obstacles), space-time blob variants. B is unmodified TG-MPPI (Table\nobreakspace  {}V\hbox {}); B$_{\mathrm  g}$ is B on the CUDA backend; blob-extras and blob-pods are the two space-time-blob integration modes.}}{11}{}\protected@file@percent }
+\newlabel{tab:blob}{{VI}{11}}
+\newlabel{sec:blob-density}{{\mbox  {VII-B}4}{11}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {\mbox  {VII-B}4}Space-time blob and obstacle density}{11}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {VIII}Discussion and Limitations}{11}{}\protected@file@percent }
+\newlabel{sec:discussion}{{VIII}{11}}
 \bibstyle{IEEEtran}
 \bibdata{refs}
-\bibcite{williams2017mppi}{1}
-\bibcite{williams2018mppi}{2}
-\bibcite{fox1997dwa}{3}
-\bibcite{trevisan2024biased}{4}
-\bibcite{bhattacharya2012hsignature}{5}
-\bibcite{roesmann2017teb}{6}
-\bibcite{degroot2025tmpc}{7}
-\bibcite{macenski2023nav2}{8}
-\@writefile{lot}{\contentsline {table}{\numberline {I}{\ignorespaces Dynamic benchmark, 60 trials (15 per condition, four legs each). Effective speed is straight-line distance over time on successful legs. Contacts are scored from ground truth.}}{7}{}\protected@file@percent }
-\newlabel{tab:main}{{I}{7}}
-\@writefile{toc}{\contentsline {section}{\numberline {IX}Conclusion}{7}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{References}{7}{}\protected@file@percent }
-\gdef \@abspage@last{7}
+\bibcite{fox1997dwa}{1}
+\bibcite{roesmann2017teb}{2}
+\bibcite{williams2017mppi}{3}
+\bibcite{williams2018mppi}{4}
+\@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces The mechanism the space--time blob generalises: flooding $(x,y,t)$ keeps the full reachable set at every time layer, not just two candidate routes through it (reference-sandbox prototype, single synthetic obstacle, \SI {4}{\second } horizon, \SI {0.2}{\second } layers). The reachable region grows from the robot's start (darker = fewer layers elapsed) and is bitten into by the obstacle's own moving footprint (gray disc) as the flood advances -- the same notch that separates the wait and detour homotopy classes extracted by \texttt  {SpaceTimeBody} (Section\nobreakspace  {}\mbox  {VII-B}4\hbox {}). Shown for intuition; the quantitative claims of Section\nobreakspace  {}\mbox  {VII-B}4\hbox {} come only from the matched Gazebo and sandbox panels.}}{12}{}\protected@file@percent }
+\newlabel{fig:spacetime-flood-mechanism}{{8}{12}}
+\@writefile{toc}{\contentsline {section}{\numberline {IX}Conclusion}{12}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{References}{12}{}\protected@file@percent }
+\bibcite{mandow2007skidsteer}{5}
+\bibcite{vlahov2024lowfrequency}{6}
+\bibcite{kim2022smooth}{7}
+\bibcite{mohamed2022logmppi}{8}
+\bibcite{gandhi2021robust}{9}
+\bibcite{aldrich2025soppi}{10}
+\bibcite{trevisan2024biased}{11}
+\bibcite{bhattacharya2012hsignature}{12}
+\bibcite{degroot2025tmpc}{13}
+\bibcite{macenski2023nav2}{14}
+\@writefile{lof}{\contentsline {figure}{\numberline {9}{\ignorespaces The same flood as a stack of time layers in $(x,y,t)$. Each translucent sheet is one layer's reachable set (Fig.\nobreakspace  {}8\hbox {} collapsed to a single instant); the dotted line is the moving obstacle's own trajectory traced through time, i.e.\ the exclusion tube each layer's notch is a cross-section of. A route that stays on one side of the tube throughout is one homotopy class; a route that crosses to the other side is distinct under Eq.\nobreakspace  {}21\hbox {}.}}{13}{}\protected@file@percent }
+\newlabel{fig:spacetime-flood-volume}{{9}{13}}
+\gdef \@abspage@last{13}

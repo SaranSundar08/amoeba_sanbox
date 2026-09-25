@@ -9,6 +9,8 @@
 \usepackage{url}
 \usepackage[table]{xcolor}
 \usepackage{siunitx}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
 \sisetup{detect-weight=true, detect-family=true}
 
 %% Draft-only marker. Set \draftfalse before submitting: every \todo vanishes.
@@ -19,34 +21,40 @@
 \begin{document}
 
 \title{Topology-Guided Model Predictive Path Integral Control\\
-for Dynamic Obstacle Avoidance on a Skid-Steer Robot}
+for Dynamic Obstacle Avoidance on SLIP, a Skid-Steer Robot for
+Construction Sites}
 
 \author{Saran~Sundar%
-\thanks{Manuscript prepared September 2026. The author is with [institution].}%
-\thanks{Source, benchmark harness and raw trial data: [repository URL].}}
+\thanks{Manuscript prepared September 2026. The author is with the Faculty
+of Mechanical Engineering, Delft University of Technology (TU Delft), Delft,
+The Netherlands (e-mail: saransundar2002@gmail.com).}%
+\thanks{Source, benchmark harness and raw trial data: [repository URL].}%
+\thanks{SLIP: Scalable Locomotion for Imperfect Places.}}
 
 \markboth{MSc Thesis Report, September 2026}{Sundar: Topology-Guided MPPI for Dynamic Obstacle Avoidance}
 
 \maketitle
 
 \begin{abstract}
-Sampling-based model predictive control such as Model Predictive Path Integral
-(MPPI) control optimises a single distribution over control sequences. In
-environments containing moving obstacles this is a liability: the optimal
-manoeuvre may be to pass an obstacle on either side, and averaging samples drawn
-from both options yields a control that does neither. Topology-driven methods
-address this by optimising several trajectories in distinct homotopy classes in
-parallel. This report presents TG-MPPI, a topology-guided MPPI controller that
-constructs candidate guidance trajectories from a robot-centred geodesic flood
-field, allocates sample groups to them, and evaluates a separate free energy per
-group. TG-MPPI is implemented as a drop-in Nav2 controller plugin and evaluated
-against the unmodified Nav2 MPPI baseline on a simulated skid-steer robot in
-scripted dynamic-obstacle scenarios.
-\todo{one sentence of headline result once the re-run lands}
-The evaluation isolates constant-velocity obstacle prediction from topological
-guidance through a controlled ablation.  The final comparison is reported with
-a route-distinctness test based on relative winding, replacing an earlier test
-that was structurally unable to recognise pass-before/pass-behind alternatives.
+Model Predictive Path Integral (MPPI) control can struggle in narrow dynamic
+environments when feasible manoeuvres form several distinct route modes. This
+report presents TG-MPPI, a topology-guided formulation that derives ancillary
+controllers from locally reachable geodesic structure and evaluates their
+sample groups separately. The method is intended to preserve alternatives such
+as passing, waiting and detouring rather than averaging incompatible control
+strategies. It targets SLIP (Scalable Locomotion for Imperfect Places), a
+skid-steer platform built for active construction sites, where narrow,
+frequently reconfigured passages and uncontrolled worker/vehicle traffic make
+these route alternatives common rather than exceptional. The central question
+is whether this explicit route structure improves navigation beyond the
+benefit of predicting obstacle motion alone.
+Experiments show that pseudopod-derived guidance is useful when the nominal
+route is locally blocked. In the broader dynamic-obstacle evaluation, however,
+the improvement over standard MPPI is reproduced by obstacle prediction
+without topological guidance. TG-MPPI therefore provides a practical mechanism
+for generating structured MPPI proposals, but its additional navigation
+benefit is scenario dependent and was not established in the final dynamic
+benchmark.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -69,46 +77,134 @@ weighted average of sampled perturbations. This representation is effective
 when good samples form one coherent mode. Near an obstacle, however, samples
 may split between left/right or pass/wait alternatives. Their average need not
 represent either alternative and can point toward the obstacle or hesitate
-between routes. The dynamic scenes in Fig.~\ref{fig:route} are designed to
-expose this interaction between spatial congestion and obstacle timing on a
+between routes. Figure~\ref{fig:trajectory-motivation} gives a compact visual
+example of the sampled trajectories and structured guidance underlying this
+motivation. The dynamic scenes in Fig.~\ref{fig:route} are designed to expose
+the interaction between spatial congestion and obstacle timing on a
 rectangular skid-steer platform.
 
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.48\columnwidth]{figures/multimodal_trajectory_motivation.png}
+  \caption{Motivating snapshot of sampled MPPI rollouts (green), a nominal
+  route (blue/grey), and pseudopod-derived guidance (magenta). The image
+  illustrates route-conditioned sampling and is not a quantitative result.}
+  \label{fig:trajectory-motivation}
+\end{figure}
+
+This problem is not only of academic interest for the platform targeted by
+this work. SLIP -- Scalable Locomotion for Imperfect Places -- was built for
+deployment on active construction sites, one of the clearest real-world
+examples of an ``imperfect place'': stacked materials, parked machinery and
+scaffolding create narrow passages that are reconfigured from day to day
+rather than fixed like a warehouse floor plan, and workers and vehicles move
+through them on timing the robot cannot control. The name also reflects a
+second, everyday inspiration: dense, largely unregulated urban traffic of the
+kind found on the roads of Chennai, India, where vehicles, pedestrians and
+obstacles share the same narrow space with no reliable lane discipline or
+predictable timing. Both settings are instances of the same underlying
+class of environment. These are precisely the conditions under which a
+single averaged MPPI route is expected to fail, not an adversarial edge case
+constructed for a benchmark. Multimodal route preservation is therefore
+treated in this work as a requirement of SLIP's intended deployment, not an
+optional refinement of MPPI.
+
 This work asks whether explicit local route modes improve MPPI beyond the
-benefit obtained from predicting obstacle motion alone. TG-MPPI constructs a
-robot-centred geodesic body from the local costmap, extracts locally distinct
-``pseudopod'' branches, converts them to dynamically feasible ancillary control
-sequences, and assigns separate groups of MPPI samples to these proposals. A
-time-expanded search can additionally propose wait and detour strategies around
-predicted moving obstacles. The controller is implemented as a separate Nav2
-plugin so that the stock Nav2 MPPI implementation remains an untouched
-baseline.
+benefit obtained from predicting obstacle motion alone. To investigate this
+question, TG-MPPI uses locally reachable topology to preserve multiple
+candidate manoeuvres during sampling instead of collapsing them into a single
+control distribution. Its behaviour is studied first in a controlled sandbox
+and then through a matched Nav2/Gazebo comparison on a skid-steer robot.
+The target is SLIP, a custom-built four-wheel skid-steer platform -- the same
+drivetrain construction equipment uses for traction over uneven, debris-strewn
+ground -- rather than an off-the-shelf differential-drive robot built for
+structured indoor floors. Its geometry, sensing layout and velocity-command
+interface impose the footprint and motion constraints used throughout this
+work.
 
 The contributions of this report are:
 \begin{enumerate}
-  \item TG-MPPI, a topology-guided MPPI controller that derives candidate
-        guidance trajectories from a geodesic flood field rather than from a
-        separate global topological planner, implemented as a Nav2 plugin
-        (Section~\ref{sec:method});
+  \item an online method for deriving pseudopod-based ancillary controllers --
+        candidate route trajectories traced from a local geodesic flood, one
+        per distinct passable exit -- from locally reachable geodesic
+        topology (Section~\ref{sec:method});
+  \item a documented SLIP robot-to-simulation-to-Nav2 integration that makes
+        the controller testable against the platform's geometry and sensing
+        constraints (Section~\ref{sec:slip-platform});
   \item a scripted, reproducible dynamic-obstacle benchmark with ground-truth
         contact scoring, in which every condition sees identical obstacle
         trajectories (Section~\ref{sec:setup});
   \item an ablation separating the contribution of obstacle prediction from
         that of topological guidance (Section~\ref{sec:results}); and
-  \item an evaluation of space--time route guidance using a winding-based
-        distinctness test, together with a diagnosis of why the earlier
-        synchronised-time test was invalid
-        (Section~\ref{sec:distinctness}).
+  \item an evaluation of spatial and space--time guidance using a
+        winding-based route-distinctness test (Section~\ref{sec:distinctness}).
 \end{enumerate}
 
 \section{Related Work}
-MPPI casts finite-horizon stochastic control as an importance-weighted update
-over sampled control perturbations and maps naturally to parallel hardware
-\cite{williams2017mppi,williams2018mppi}. Unlike local reactive methods such as
-the Dynamic Window Approach \cite{fox1997dwa}, it evaluates complete short
-trajectories rather than admissible instantaneous velocities. The standard
-formulation nevertheless represents its solution with one nominal sequence;
-it does not explicitly preserve multiple route classes when the rollout
-distribution becomes multimodal.
+Local motion planners for cluttered, dynamic environments broadly fall into
+three families. Reactive geometric methods such as the Dynamic Window
+Approach \cite{fox1997dwa} search directly over admissible instantaneous
+velocities; they run cheaply and react immediately, but their short lookahead
+makes them prone to local minima and to manoeuvres that only become unsafe a
+few steps later. Gradient-based trajectory optimisers such as the Timed
+Elastic Band \cite{roesmann2017teb} instead optimise a full short-horizon
+trajectory against a smooth cost, giving better dynamic feasibility and
+lookahead -- but a gradient descended from one initial guess converges to
+whichever single local minimum it started nearest to. When the free space
+around an obstacle is genuinely multimodal (pass left, pass right, wait), that
+single-mode collapse is structural, not a tuning failure: the optimiser never
+considers the alternative it did not start near.
+
+Sampling-based stochastic control sidesteps that specific problem by
+replacing the gradient with many randomly perturbed rollouts, reweighted by
+their cost. MPPI casts finite-horizon stochastic control as such an
+importance-weighted update over sampled control perturbations and maps
+naturally to parallel hardware \cite{williams2017mppi,williams2018mppi}: it
+evaluates complete short trajectories rather than admissible instantaneous
+velocities or a single optimised one, so a good candidate through either side
+of an obstacle can be discovered without a gradient ever pointing there. The
+standard formulation nevertheless represents its solution with one nominal
+sequence; it does not explicitly preserve multiple route classes when the
+rollout distribution becomes multimodal -- the same collapse TEB suffers from
+reappears one step later, at the reweighting stage instead of the gradient
+step.
+
+For mobile-robot control, MPPI is attractive because forward simulation can
+accommodate nonlinear dynamics and non-convex combinations of path tracking,
+goal progress, obstacle proximity, control effort and command variation without
+requiring derivatives. This flexibility is not free: behaviour depends strongly
+on horizon length, temperature, perturbation covariance, rollout-model fidelity
+and the available sample budget. Longer horizons expose delayed collisions but
+increase computation, while an uninformative proposal can spend most rollouts
+on infeasible motion. These trade-offs are especially relevant to skid-steer
+platforms, whose realised turning motion can depart from ideal unicycle
+kinematics through lateral slip and wheel scrubbing
+\cite{mandow2007skidsteer}. Receding-horizon replanning corrects new state
+errors but does not by itself remove this model mismatch.
+
+Existing MPPI variants address different parts of this practical problem.
+Low-frequency perturbations introduce temporal correlation to reduce
+high-frequency control variation \cite{vlahov2024lowfrequency}, while smooth
+MPPI uses an input-lifting formulation to suppress command jitter without a
+separate post-processing filter \cite{kim2022smooth}. Log-MPPI reshapes the
+sampling distribution to improve exploration in clutter
+\cite{mohamed2022logmppi}, and robust MPPI couples nominal sampling with
+feedback reasoning under disturbances \cite{gandhi2021robust}. Closer to mode
+preservation itself, SOPPI applies Stein Variational Gradient Descent (SVGD)
+between MPPI steps so that a repulsive kernel force spreads sampled
+trajectories apart and resists collapse onto a single mean
+\cite{aldrich2025soppi}. That repulsion is generic and requires
+differentiating the rollout through the cost and dynamics, which reintroduces
+exactly the gradient fragility sampling-based MPPI was meant to avoid and has
+so far only been demonstrated on cart-pole, arm and legged-locomotion
+benchmarks rather than obstacle-cluttered navigation; it has no notion of
+\emph{why} distinct modes exist in a particular scene. TG-MPPI instead derives
+its modes directly from the locally reachable geodesic topology of the actual
+environment, without differentiating anything. These methods
+improve smoothness, exploration, execution robustness or generic sample
+diversity, but none prescribes how to construct several environment-dependent
+route modes and prevent their
+control updates from cancelling one another.
 
 Biased-MPPI generalises the sampling step by allowing ancillary controllers to
 inject informative control sequences instead of drawing every candidate around
@@ -131,18 +227,67 @@ compared, but they do not directly specify how a sampling-based controller
 should construct and allocate its rollout distribution.
 
 The closest methodological reference is topology-driven parallel trajectory
-optimisation (T-MPC), which builds multiple candidate routes and optimises them
-in parallel in dynamic environments \cite{degroot2025tmpc}. TG-MPPI adopts the
-same high-level principle---preserve and compare distinct decisions---but uses
-a rolling geodesic flood field rather than a probabilistic road map to create
-local spatial guidance. It then represents the alternatives as groups inside
-one MPPI rollout batch rather than as independent gradient-based trajectory
-optimisers. The result is packaged within Nav2 \cite{macenski2023nav2}, making
-an unmodified Nav2 MPPI plugin the operational baseline rather than comparing
-against a separately reimplemented controller.
+optimisation (T-MPC), which is explicitly presented by its authors as a
+\emph{global} planner: a probabilistic-roadmap-style topology stage identifies
+several distinct homotopy classes across the free space, and each seeds an
+independent \emph{local} gradient-based optimiser running in parallel
+\cite{degroot2025tmpc}. TG-MPPI adopts the same high-level
+principle---preserve and compare distinct decisions---entirely inside the
+local stage, for two reasons a global topology search would not fit. First,
+Nav2 already supplies a global planner upstream of the controller
+\cite{macenski2023nav2}; a second global topology stage inside the local
+controller would duplicate that role rather than add to it. Second, T-MPC's
+per-class cost is a full nonlinear program, so amortising it against a
+global search is worthwhile; TG-MPPI's per-mode cost is instead a group of
+sampled rollouts recomputed every control cycle regardless, so a cheap
+rolling geodesic flood over the local costmap already gives the sampling
+bias it needs without a separate global search. It represents the
+alternatives as groups inside one MPPI rollout batch rather than as
+independent gradient-based trajectory optimisers, and the result is packaged
+within Nav2 as an unmodified Nav2 MPPI plugin standing in for the
+operational baseline, rather than a separately reimplemented controller.
 
 \section{Background and Problem Formulation}
 \label{sec:problem}
+
+\begin{table*}[t]
+\centering
+\caption{Notation. Symbols follow standard information-theoretic MPC usage
+\cite{williams2017mppi,williams2018mppi,trevisan2024biased} where a
+robotics-standard choice exists; problem-specific symbols are defined once,
+here and at first use, and are not reused for anything else in this paper.}
+\label{tab:notation}
+\begin{tabular}{cl@{\hspace{2.2em}}cl}
+\toprule
+Symbol & Meaning & Symbol & Meaning \\
+\midrule
+$\mathbf x_t,\ \mathbf u_t$ & Robot state, control at step $t$ &
+  $\mathcal B_\rho$ & Geodesic flood body ($\rho$-sublevel set of $d_r$) \\
+$U=(\mathbf u_0,\ldots,\mathbf u_{T-1})$ & Control sequence over the horizon &
+  $\partial\mathcal B_\rho$ & Outward flood membrane \\
+$S(U)$ & Trajectory cost, Eq.~\eqref{eq:trajectory-cost} &
+  $\operatorname{Adj}_8(p)$ & 8-connected grid neighbours of $p$ \\
+$P,\ Q$ & Reference / optimised control distributions &
+  $h(m)$ & Terminal cost-to-go (``promise'') at membrane cell $m$ \\
+$\lambda$ & MPPI temperature (cost/KL trade-off) &
+  $\eta(p)$ & Narrow-channel obstacle-proximity weight \\
+$w^{(i)}$ & Self-normalised sample weight &
+  $D_g(p)$ & Weighted navigation value inside the body \\
+$q_s(U)$ & Ancillary (biased) sampling proposal density &
+  $P_m$ & Topology-distinct branch (pseudopod) centreline \\
+$\pi_m,\ \boldsymbol\mu_m,\ \Sigma_m$ & Weight, mean, covariance of ancillary mode $m$ &
+  $\boldsymbol\mu_m$ & Ancillary control-sequence mean from branch $P_m$, Eq.~\eqref{eq:ancillary-short} \\
+$\Delta r$ & Local costmap / flood grid resolution &
+  $\mathcal G_g,\ F_g$ & Sample group $g$ and its free energy \\
+$r_p$ & Circular planning-footprint radius &
+  $\hat o_j(\tau_k)$ & Predicted position of obstacle $j$ at time $\tau_k$ \\
+$d_r(p)$ & Geodesic (obstacle-free) distance from the robot to $p$ &
+  $\lambda_{\mathrm w}$ & Normalised winding number, Eq.~\eqref{eq:winding} \\
+$\mathcal F$ & Collision-free grid cells &
+  $\rho$ & Geodesic flood reach (a travel-distance budget) \\
+\bottomrule
+\end{tabular}
+\end{table*}
 
 \subsection{Information-theoretic stochastic control}
 Consider a robot with state $\mathbf{x}_t\in\mathbb R^n$ and control
@@ -227,10 +372,13 @@ geodesic pseudopods and space--time alternatives.
 
 For clarity, the sandbox includes the explicit density correction
 of~\eqref{eq:biased-mppi-weight}, but the evaluated Nav2 controller uses the
-stable grouped V3 estimator described in Section~\ref{sec:impl}: conditional
-softmax weights inside each group followed by discrete group selection. It
-inherits Biased-MPPI's ancillary-proposal principle, but is not claimed to be an
-exact implementation of its fully importance-corrected estimator.
+conditional within-group softmax estimator of~\eqref{eq:grouped-objective}
+(implementation details in Section~\ref{sec:impl}): costs are normalised
+within each proposal group and the minimum-free-energy group's weighted
+update is applied, without correcting for the fact that the samples were
+drawn from a mixture proposal. It inherits Biased-MPPI's ancillary-proposal
+principle, but is not claimed to be an exact implementation of its
+fully importance-corrected estimator.
 
 \subsection{Multimodal failure addressed by TG-MPPI}
 Equation~\eqref{eq:mppi} still forms one control average. If similarly weighted
@@ -254,6 +402,21 @@ compare them without averaging opposed controls together.
 
 \section{Method: TG-MPPI}
 \label{sec:method}
+Figure~\ref{fig:pipeline} summarises the complete receding-horizon computation.
+The first stage is the proposed topology-to-ancillary-controller construction;
+the second and third stages evaluate and commit to one proposal without
+averaging across opposed route modes.
+
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=0.96\textwidth]{figures/tg_mppi_flowchart.png}
+  \caption{TG-MPPI architecture. Robot state, local geometry, the Nav2 global
+  path and predicted obstacle motion generate collision-validated spatial and
+  space--time ancillary means. Separate MPPI sample groups are rolled out and
+  scored by the common critic set. A committed-mode decision selects one
+  conditional update, whose first command is executed before replanning.}
+  \label{fig:pipeline}
+\end{figure*}
 
 \subsection{Geodesic flood field and the robot-centred body}
 The local costmap is discretised at resolution $\Delta r$ and obstacles are
@@ -304,7 +467,16 @@ therefore changes shape rather than translating as a rigid Euclidean disc.
 \end{figure*}
 
 \subsection{Pseudopod branches as guidance trajectories}
-Every membrane cell $m$ receives a terminal cost-to-go, or \emph{promise},
+A \emph{pseudopod} is, concretely, a single traced path from one promising
+membrane exit back to the robot, converted into one ancillary control
+sequence -- the name borrows the biological term for a temporary protrusion
+an amoeba extends toward a direction it may move in, since the flood body
+here does the same thing toward each candidate route before the robot
+commits to one. The previous section built one geodesic distance field per
+cycle; this section selects a handful of its membrane cells as pseudopod
+endpoints and turns each into an ancillary mean trajectory a sample group can
+be centred on. Every membrane cell $m$ first receives a terminal cost-to-go,
+or \emph{promise},
 from the global path $\mathcal P=\{z_k\}$,
 \begin{equation}
  h(m)=\min_{z_k\in\mathcal P}
@@ -356,6 +528,40 @@ head start over small guidance groups, independent of trajectory quality. Both
 an unequal (\emph{legacy}) and an equal-share allocation are evaluated in
 Section~\ref{sec:results}.
 
+Algorithm~\ref{alg:tgmppi} states the complete online procedure. Operations up
+to branch generation run at the lower flood-field update rate; sampling,
+rollout, scoring and selection run every control cycle.
+
+\begin{algorithm}[t]
+\caption{Topology-Guided Grouped MPPI}
+\label{alg:tgmppi}
+\begin{algorithmic}[1]
+\Require state $x_k$, costmap $C_k$, path $\mathcal P$, tracked obstacles
+$\hat{\mathcal O}_{0:T}$, batch $N$, horizon $T$
+\Ensure applied control $u_k^*$
+\State $\mathcal F\gets\Call{InflatedFreeCells}{C_k,r_p}$
+\State $d_r\gets\Call{Dijkstra}{p_k,\mathcal F}$
+\State $\mathcal B_\rho\gets\{p\in\mathcal F:d_r(p)\leq\rho\}$
+\State $\partial\mathcal B_\rho\gets\Call{OutwardBoundary}{\mathcal B_\rho,\mathcal F}$
+\State $D_g\gets\Call{NavigationField}{\partial\mathcal B_\rho,\mathcal P,C_k}$
+\State $\{P_m\}\gets\Call{DistinctBacktraces}{d_r,D_g,\mathcal F}$
+\State $\{P_m\}\gets\{P_m\}\cup
+\Call{STAlternatives}{\{P_m\},\hat{\mathcal O}_{0:T}}$
+\State $\mathcal M\gets\{\Call{ProjectValid}{P_m,x_k,T,C_k}\}$
+\State discard infeasible means; add nominal/path fallback $\mu_0$
+\State $\{N_m\}\gets\Call{AllocateGroups}{N,\mathcal M}$
+\ForAll{$m\in\mathcal M$}
+  \State $U_m^{(i)}\sim\mathcal N(\mu_m,\Sigma_m)$, $i=1,\ldots,N_m$
+  \State $X_m^{(i)}\gets\Call{Rollout}{x_k,U_m^{(i)}}$
+  \State $S_m^{(i)}\gets\Call{Nav2Critics}{X_m^{(i)},U_m^{(i)},\hat{\mathcal O}_{0:T}}$
+  \State $(F_m,w_{i\mid m},\bar U_m)\gets\Call{ConditionalUpdate}{S_m,U_m}$
+\EndFor
+\State $m^*\gets\Call{CommitMode}{\{F_m\},\text{dwell, margin, confirm}}$
+\State $u_k^*\gets(\bar U_{m^*})_0$
+\State \Return $u_k^*$
+\end{algorithmic}
+\end{algorithm}
+
 \subsection{Space-time routes}
 Spatial pseudopods distinguish routes around static geometry but cannot encode
 that the same position may be blocked at one arrival time and free at another.
@@ -384,6 +590,37 @@ as the spatial pseudopods. The search is proposal generation, not collision
 avoidance by itself: the predicted-obstacle critic still scores every MPPI
 rollout. Only routes that pass the winding-based distinctness test below are
 added as separate groups.
+
+The space--time proposal subroutine is given in
+Algorithm~\ref{alg:spacetime}. Running the graph search with two wait costs is
+what creates a timing alternative; the winding test decides whether it adds a
+meaningfully different mode.
+
+\begin{algorithm}[t]
+\caption{Space--Time Alternative Generation}
+\label{alg:spacetime}
+\begin{algorithmic}[1]
+\Require pseudopods $\{P_m\}$, predicted obstacles $\hat{\mathcal O}_{0:T_s}$
+\Ensure distinct wait/detour candidates $\mathcal A_{st}$
+\State $\mathcal A_{st}\gets\varnothing$
+\ForAll{$P_m$ in priority order}
+  \State $o^*\gets\Call{NearestPredictedCrossing}{P_m,\hat{\mathcal O}_{0:T_s}}$
+  \If{$o^*$ exists}
+    \State $G_{st}\gets\Call{TimeGraph}{P_m,o^*,\Delta r_s,\Delta t_\ell}$
+    \State $\pi_w\gets\Call{Dijkstra}{G_{st},c_w^{\mathrm{cheap}}}$
+    \State $\pi_d\gets\Call{Dijkstra}{G_{st},c_w^{\mathrm{expensive}}}$
+    \ForAll{$\pi\in\{\pi_w,\pi_d\}$}
+      \State $\mu_\pi\gets\Call{ProjectValid}{\pi,x_k,T,C_k}$
+      \If{$\mu_\pi$ feasible and \Call{OppositeWinding}{$\pi,P_m,o^*$}}
+        \State $\mathcal A_{st}\gets\mathcal A_{st}\cup\{\pi\}$
+      \EndIf
+    \EndFor
+    \State \textbf{break} \Comment{bounded single-crossing budget}
+  \EndIf
+\EndFor
+\State \Return $\mathcal A_{st}$
+\end{algorithmic}
+\end{algorithm}
 
 Figure~\ref{fig:spacetime-topology} visualises the construction in both the
 ground plane and the time-expanded volume. A moving obstacle becomes a tube in
@@ -441,7 +678,8 @@ a LibTorch/CUDA backend; unsupported operations retain a CPU path and the
 controller falls back to CPU if CUDA is unavailable. The control-period budget
 is \SI{50}{ms}.
 
-The Nav2 implementation uses the grouped V3 estimator: costs are normalised
+The Nav2 implementation uses within-group (conditional) softmax weighting
+rather than full-mixture importance correction: costs are normalised
 within each proposal group, group free energies are compared, and only the
 selected group's weighted control update is applied. Dwell time, a free-energy
 switch margin, confirmation cycles and per-mode warm starts suppress mode
@@ -450,6 +688,45 @@ $\log p(U)-\log q(U)$ of full importance-corrected Biased MPPI. Consequently,
 the thesis evaluates a topology-guided grouped MPPI implementation, while the
 importance-corrected estimator remains a sandbox formulation rather than a
 claim about the deployed Nav2 controller.
+
+\subsection{SLIP platform and digital representation}
+\label{sec:slip-platform}
+SLIP was built as a four-wheel skid-steer mobile robot for navigation in
+constrained spaces, with active construction sites as the primary intended
+deployment setting: narrow, temporary passages between stacked materials and
+equipment, and worker/vehicle traffic on timing the robot cannot control,
+motivate the topological guidance problem studied in this report. The project
+includes a CAD-derived ROS robot description
+with the chassis, four wheel joints, sensor frames and collision geometry, and
+a Gazebo model using the same frame layout. The wheel joints have no steering
+degree of freedom: changes in heading require differential wheel-side speeds
+and tyre--ground scrubbing. This matters because a commanded angular velocity
+does not uniquely determine the realised turn on the physical platform.
+
+The navigation interface accepts the same planar linear/angular velocity
+(\texttt{cmd\_vel}) commands a differential-drive robot would: the control
+stack is unaware that the platform is mechanically skid-steer. Skid-steer
+behaviour is realised entirely below this interface, by the wheel-side speed
+mixer and tyre--ground scrubbing described above; the planner and controller
+both reason in the same unicycle-like command space regardless of the true
+mechanism, which is itself a source of plant/model mismatch this report
+returns to in Section~\ref{sec:discussion}.
+The simulation drive plugin maps these commands to the wheel pairs using a
+\SI{0.74}{m} track width and \SI{0.33}{m} wheel diameter. Local planning uses a
+\SI{0.84}{m}$\times$\SI{0.68}{m} rectangular footprint rather than a point or
+circular robot. The robot description locates front and rear lidar frames, an
+IMU and a depth-camera frame; the benchmark costmap consumes front and rear
+laser observations as separate sources. The dynamic benchmark uses the
+simulated lidars and a ground-truth map pose, whereas the planned physical
+trial will use the onboard lidar and Vicon. Those sources must not be treated
+as equivalent evidence of perception or localisation robustness.
+
+This platform work is an engineering contribution: constructing a robot and
+its consistent digital/navigation interfaces makes controller transfer
+possible. It is not presented as proof of a new skid-steer mechanism or a
+validated slip model. The present quantitative claims come from sandbox and
+Gazebo experiments; hardware tracking error, latency, slip and safety remain
+to be measured in the physical validation study.
 
 \subsection{Development sandbox and transfer to Nav2}
 The algorithm was first developed in an independent NumPy/PyTorch sandbox. It
@@ -471,15 +748,55 @@ headline statistics.
 \label{sec:setup}
 
 \subsection{Robot and simulator}
-Experiments use the SLIP skid-steer model in Gazebo Classic 11 and ROS~2
-Humble. Planning and contact scoring use its rectangular
-\SI{0.84}{m}$\times$\SI{0.68}{m} footprint. The benchmark launch sets
+Experiments use the SLIP model described in Section~\ref{sec:slip-platform}
+with Gazebo Classic 11 and ROS~2 Humble. The benchmark launch sets
 $v_{x,\max}={}$\SI{1.5}{\metre\per\second}; the controller additionally enforces
-its configured acceleration and yaw-rate limits. Front and rear lidar data
-populate the local costmap, while localisation is supplied from Gazebo ground
-truth through the same map--odometry interface intended for motion-capture
-localisation on the physical platform. AMCL is therefore not part of the
+its configured acceleration and yaw-rate limits. Planning and contact scoring
+use the rectangular footprint. Localisation is supplied from Gazebo ground
+truth through the map--odometry interface intended for motion-capture
+localisation on the physical platform; AMCL is therefore not part of the
 reported comparison.
+
+\begin{table}[t]
+\centering
+\caption{System parameters used in the reported Nav2/Gazebo experiments
+(Table~\ref{tab:main}, \ref{tab:blob}), read from the deployed controller
+configuration. Values that vary by design across an experiment (e.g.\
+$v_{x,\max}$ under the dynamic-obstacle command-speed override, described in
+Section~\ref{sec:setup}) are reported there instead of here.}
+\label{tab:params}
+\begin{tabular}{lll}
+\toprule
+Parameter & Symbol & Value \\
+\midrule
+\multicolumn{3}{l}{\textit{Sampling}} \\
+Samples per cycle & $N$ & 2000 \\
+Horizon length & $T$ & 56 steps \\
+Control/model time step & $\Delta t$ & \SI{0.05}{\second} \\
+MPPI temperature & $\lambda$ & 0.3 \\
+\addlinespace
+\multicolumn{3}{l}{\textit{Geodesic body and pseudopods}} \\
+Grid / costmap resolution & $\Delta r$ & \SI{0.025}{\metre} \\
+Flood reach (travel-distance budget) & $\rho$ & \SI{2.5}{\metre} \\
+Flood re-flood interval & --- & every control cycle \\
+Retained branches (pseudopods) & --- & 3 \\
+Branch match distance (re-identification) & --- & \SI{1.0}{\metre} \\
+\addlinespace
+\multicolumn{3}{l}{\textit{Mode selection}} \\
+Free-energy switch margin & --- & 0.3 \\
+Minimum dwell before a switch & --- & 10 cycles \\
+Switch confirmation window & --- & 3 cycles \\
+\addlinespace
+\multicolumn{3}{l}{\textit{Robot}} \\
+Footprint (length $\times$ width) & --- & \SI{0.84}{m}$\times$\SI{0.68}{m} \\
+Longitudinal speed range & $v_x$ & $[-0.35,\ 0.35]$\,\si{\metre\per\second} \\
+Yaw-rate limit & $w_{\max}$ & \SI{1.9}{\radian\per\second} \\
+\addlinespace
+\multicolumn{3}{l}{\textit{Space--time distinctness}} \\
+Winding-number pass threshold & --- & $1/(4\pi)$ \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \subsection{Scenarios}
 Five scenarios (\texttt{dyn1}--\texttt{dyn5}) were generated over a common
@@ -523,6 +840,25 @@ effective speed, driven-path ratio, minimum clearance, first-contact cause,
 recovery count, controller cycle time and deadline misses. Unattempted legs
 after early trial termination count as failures in planned-leg success rates.
 
+\subsection{Reference-sandbox protocol}
+Before Nav2 integration, the proposed sampling mechanism was frozen and tested
+in the independent PyTorch sandbox with the analytical SLIP model. Four
+controllers used identical dynamics, footprint, cost weights, limits,
+$N=1024$ samples and a 56-step horizon: ordinary MPPI; path-tracking MPPI,
+which adds an A* reference only to the rollout cost; single-path Biased MPPI,
+which samples around one A*-derived ancillary mean; and full TG-MPPI, which
+adds up to three pseudopod-derived ancillary distributions. The ordinary
+narrow-navigation matrix comprised ten declared BARN worlds and five matched
+sampling seeds (50 runs per controller).
+
+A separate blocked-path experiment isolated the thesis mechanism. It compared
+full TG-MPPI against a \emph{flow-only} control with the same geodesic
+field, path bias, gate, dynamics and costs, but with pseudopod extraction and
+grouped ancillary proposals disabled. Ten paired seeds were used. Outcomes
+were compared with an exact two-sided McNemar test. Finally, controller update
+time was measured serially on worlds 7, 48 and 42; these Python timings
+characterise the reference implementation and are not Nav2 real-time results.
+
 \subsection{Physical SLIP validation plan}
 Following the simulation benchmark, a limited matched validation is planned on
 the physical SLIP platform. Localisation will be supplied by Vicon and obstacle
@@ -546,75 +882,295 @@ speed and a non-human soft obstacle are required for the moving trial.
 \section{Results}
 \label{sec:results}
 
+\subsection{Reference-sandbox results}
+The frozen static matrix establishes the behaviour of the complete method over
+the declared development worlds (Table~\ref{tab:sandbox-static}). Full TG-MPPI
+MPPI succeeded in all 50 runs with no collision, compared with 45/50 for the
+single-path Biased MPPI baseline, 39/50 for path-tracking MPPI and 25/50 for
+ordinary MPPI. Exact-footprint revalidation produced zero outcome changes in
+all 200 matched runs. These results must not, however, be used alone to claim a
+pseudopod effect: although branches were available in 70.9\,\% of TG-MPPI
+cycles, a branch was selected in 0\,\% of cycles in this ordinary static
+matrix. They support the complete gated controller, while the blocked-path
+ablation below supplies mechanism attribution.
+
+\begin{table}[t]
+\centering
+\caption{PyTorch sandbox static matrix: 10 BARN worlds, five matched seeds per
+world. Clearance is averaged over successful runs.}
+\label{tab:sandbox-static}
+\begin{tabular}{lrrr}
+\toprule
+Method & Success & Collisions & Clearance (m) \\
+\midrule
+Vanilla MPPI       & 25/50 & 25 & 0.216 \\
+Path-tracking MPPI & 39/50 & 11 & 0.233 \\
+Single-path biased & 45/50 &  5 & 0.251 \\
+Full TG-MPPI        & 50/50 &  0 & 0.258 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\columnwidth]{../../artifacts/images/experiments/final/static_success_clearance.png}
+  \caption{Success and clearance in the frozen sandbox static matrix. This is
+  analytical-SLIP reference evidence, not a Gazebo/Nav2 result.}
+  \label{fig:sandbox-static}
+\end{figure}
+
+The paired blocked-path ablation activated the proposed mechanism
+(Table~\ref{tab:sandbox-blocked}). Full TG-MPPI succeeded in 9/10 seeds versus
+2/10 for flow-only. There were seven TG-MPPI-only successes, no flow-only-only
+successes, two joint successes and one joint failure, giving an exact
+two-sided McNemar $p=0.015625$. Pseudopod modes were selected in 47.6\,\% of
+TG-MPPI cycles, accompanied by greater peer and static clearance and much less
+stall time. This supports a causal contribution from ancillary pseudopod
+sampling in the declared deterministic blocked geometry; it does not establish
+the same effect across independent environments.
+
+\begin{table}[t]
+\centering
+\caption{Paired sandbox blocked-path attribution over ten seeds.}
+\label{tab:sandbox-blocked}
+\begin{tabular}{lrr}
+\toprule
+Metric & Flow-only & Full TG-MPPI \\
+\midrule
+Success & 2/10 & 9/10 \\
+Peer collisions & 1 & 0 \\
+Static collisions & 2 & 0 \\
+Timeouts & 5 & 1 \\
+Peer clearance (m) & 0.131 & 0.703 \\
+Static clearance (m) & 0.028 & 0.143 \\
+Mean stall time (s) & 19.96 & 5.02 \\
+Pseudopod selection & 0\,\% & 47.6\,\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\columnwidth]{../../artifacts/images/experiments/final/blocked_attribution.png}
+  \caption{Blocked-path sandbox ablation. Disabling pseudopod proposals while
+  retaining geodesic flow sharply reduced completion and clearance.}
+  \label{fig:sandbox-blocked}
+\end{figure}
+
+Isolated serial timing was 31.45, 109.60, 133.80 and
+\SI{147.97}{\milli\second} per update for vanilla, path-tracking,
+single-path-biased and full TG-MPPI, respectively. Thus the unoptimised
+Python reference does not satisfy a \SI{20}{Hz} budget; TG-MPPI added
+\SI{14.17}{\milli\second} (10.6\,\%) over the closest single-path-biased
+baseline. This measurement motivated the C++/LibTorch Nav2 implementation and
+must not be confused with its measured callback time.
+
+The positive sandbox mechanism result and the Nav2 null topology result below
+are not contradictory. The former deliberately blocks the nominal reference
+and frequently activates pseudopod proposals; the latter asks whether topology
+adds value beyond prediction in five moving-obstacle Gazebo scenarios, where
+the corrected measurements did not show such an outcome advantage.
+
+\subsection{Nav2/Gazebo dynamic benchmark}
+
 \begin{table*}[t]
 \centering
-\caption{Dynamic benchmark, 60 trials (15 per condition, four legs each).
-Effective speed is straight-line distance over time on successful legs.
-Contacts are scored from ground truth.}
+\caption{Corrected-winding dynamic benchmark: 60 trials (15 per condition,
+four planned legs each). Legs ok uses all 60 planned legs per condition;
+contacts and continuous metrics use attempted legs because a trial stops after
+two consecutive failures. Values are mean $\pm$ standard deviation.}
 \label{tab:main}
 \begin{tabular}{llcccccc}
 \toprule
  & Description & Legs ok & Eff.\ speed (\si{\metre\per\second}) & Legs w/ contact & Min clearance (\si{\metre}) & Recoveries/leg & Cycle (\si{\milli\second}) \\
 \midrule
-A   & Stock Nav2 MPPI            & 19/45 & $0.76 \pm 0.28$ & 32/45 & $-0.038 \pm 0.403$ & $12.00 \pm 8.56$ & --- \\
-B   & TG-MPPI, legacy split      & 57/59 & $0.72 \pm 0.16$ & 10/59 & $\phantom{-}0.274 \pm 0.280$ & $0.51 \pm 1.83$ & $19.2 \pm 0.5$ \\
-B$'$& TG-MPPI, equal split       & 57/59 & $0.76 \pm 0.17$ & \phantom{0}9/59 & $\phantom{-}0.287 \pm 0.242$ & $0.97 \pm 3.76$ & $19.0 \pm 0.3$ \\
-D   & Plain MPPI + prediction    & 53/57 & $0.71 \pm 0.20$ & \phantom{0}9/57 & $\phantom{-}0.276 \pm 0.291$ & $1.75 \pm 5.12$ & $15.3 \pm 0.2$ \\
+A   & Stock Nav2 MPPI            & 17/60 & $0.83 \pm 0.23$ & 28/44 & $\phantom{-}0.283 \pm 1.491$ & $9.20 \pm 8.10$ & --- \\
+B   & TG-MPPI, legacy split      & 54/60 & $0.72 \pm 0.20$ & 13/58 & $\phantom{-}0.246 \pm 0.292$ & $1.29 \pm 3.82$ & $20.0 \pm 0.9$ \\
+B$'$& TG-MPPI, equal split       & 52/60 & $0.72 \pm 0.18$ & 14/58 & $\phantom{-}0.211 \pm 0.294$ & $1.71 \pm 4.83$ & $20.1 \pm 1.0$ \\
+D   & Plain MPPI + prediction    & 53/60 & $0.71 \pm 0.19$ & \phantom{0}9/57 & $\phantom{-}0.279 \pm 0.286$ & $1.32 \pm 4.47$ & $15.7 \pm 0.5$ \\
 \bottomrule
 \end{tabular}
 \end{table*}
 
-\subsection{Prediction accounts for the gain over the baseline}
+\subsubsection{Prediction accounts for the gain over the baseline}
 Table~\ref{tab:main} shows a large and unambiguous separation between the stock
 baseline and every condition carrying obstacle prediction. The baseline
-completed 19 of 45 legs and made contact on 32; all three prediction-carrying
-conditions completed 53--57 of their legs with contact on 9--10.
-\todo{insert the Mann--Whitney/Fisher statistics and $p$-values.}
+completed 17/60 planned legs, compared with 54/60 for B and 53/60 for D.
+On per-trial success fraction, A differed from B ($p=6.6\times10^{-5}$) and D
+($p=1.2\times10^{-4}$, two-sided Mann--Whitney tests). Treating planned legs as
+binary outcomes gives $p=3.1\times10^{-12}$ and
+$p=1.7\times10^{-11}$, respectively (Fisher exact tests). Trial-minimum
+clearance also improved from A to B ($p=0.007$) and D ($p=0.008$), and
+recoveries per planned leg fell in both comparisons ($p<0.001$). Contact in at
+least one leg occurred in 14/15 A trials, 10/15 B trials and 8/15 D trials; the
+A--D contrast was significant ($p=0.035$), whereas A--B was not ($p=0.169$).
+The prediction-only control therefore reproduces the dominant success and
+recovery gain over stock MPPI.
 
-\subsection{Topology relative to prediction}
-In the original run, conditions B, B$'$ and D were statistically
-indistinguishable on every headline metric at $n=15$, while the topological
-machinery added approximately \SI{4}{\milli\second} per control cycle (19.2 vs
-\SI{15.3}{\milli\second}). That run used the invalid synchronised-time
-distinctness test, so it cannot provide the final verdict on the implemented
-space--time topology layer.
-\pending{Replace this paragraph with the B--D comparison from the corrected
-winding-number run. State whether the result is a statistically supported
-effect, a bounded null result, or an underpowered comparison; report an effect
-size and confidence interval rather than relying on $p$ alone.}
+\subsubsection{Topology does not separate from prediction}
+Under the corrected winding classifier, B completed one more planned leg than
+D (54/60 versus 53/60). The per-trial success-fraction difference was
+1.7 percentage points (cluster-bootstrap 95\,\% interval
+$[-18.3,23.3]$ points; $p=1.0$), and the planned-leg Fisher test also gave
+$p=1.0$. Differences in effective speed
+($-0.004\,\mathrm{m\,s^{-1}}$, 95\,\% interval $[-0.084,0.076]$,
+$p=0.696$), trial-minimum clearance ($-0.013\,\mathrm{m}$,
+$[-0.203,0.180]$, $p=0.917$) and recoveries per planned leg (difference
+$0.00$, $[-1.95,1.80]$, $p=0.696$) were likewise unresolved. B had contact in
+10/15 trials versus 8/15 for D ($p=0.710$).
 
-\subsection{Space-time distinctness}
+The measurable difference was computation: B required
+\SI{19.99}{\milli\second} per cycle versus \SI{15.71}{\milli\second} for D,
+an overhead of \SI{4.28}{\milli\second} (95\,\% interval
+$[3.76,4.78]\,\mathrm{ms}$; $p=3.4\times10^{-6}$). Equal allocation B$'$ also
+failed to separate from D (52/60 versus 53/60 planned legs, $p=1.0$) and from B
+($p=0.777$). The experiment therefore supports a null topology result at this
+sample size: it rules out neither modest benefit nor harm, but it provides no
+positive evidence that the added modes improve navigation in these scenes.
+
+\subsubsection{Space-time distinctness}
 \label{sec:distinctness}
-\pending{these numbers are from the synchronised-time side test and are
-superseded by the winding-number re-run; regenerate this subsection from
-\texttt{thesis\_dyn\_winding} before submission.}
-Across \num{25000} control cycles of conditions B and B$'$, the space-time
-search found a feasible route on 86--90\,\% of cycles, but \num{96.7}\,\% of
-those routes were classified non-distinct from a route the pseudopod stage had
-already produced, at a cost of \SIrange{5.1}{5.3}{\milli\second} per cycle
-(27--28\,\% of the control budget).
+Across the 15 B trials, the space--time gate detected \num{12341} predicted
+crossings. The winding test classified \num{794} route pairs (6.4\,\%) as
+distinct and \num{11547} as non-distinct. For B$'$, the corresponding counts
+were \num{918}/\num{12396} (7.4\,\%) distinct. Controller logs recorded 14 and
+17 switches into space--time mode identifiers for B and B$'$, respectively.
+These are switch events, not dwell-cycle counts, and should not be interpreted
+as a percentage of control authority.
 
-That measurement, however, reflects the distinctness \emph{test}, not the
-routes. The synchronised-time side test required both routes to lie within a
-relevance radius of the same obstacle at the same time index. A pass-before
-route and a pass-behind route are near the obstacle at \emph{different} time
-indices by construction, so the test was left unevaluated at almost every layer
-and defaulted to ``not distinct''. It was structurally blind to precisely the
-distinction it existed to detect. Replacing it with the winding number
-of~\eqref{eq:winding}, which accumulates each route's relative angle
-independently over its whole length, removes the synchronisation requirement.
-\todo{report the corrected distinctness rate and whether B vs D changes.}
+The corrected classifier therefore demonstrates that the space--time layer did
+occasionally generate and select distinct alternatives. Nevertheless, neither
+B nor B$'$ outperformed D. The earlier 96.7\,\% ``non-distinct'' figure is not
+used as evidence of route redundancy: it was produced by the obsolete
+synchronised-time test, which was structurally blind to routes passing the same
+moving obstacle at different time indices. The corrected experiment changes
+the diagnostic interpretation but not the benchmark conclusion.
+
+\subsubsection{Space-time blob and obstacle density}
+\label{sec:blob-density}
+The space--time layer in Table~\ref{tab:main} only ever proposes up to two
+extra modes when a single pseudopod detects a predicted crossing. A further
+question is whether a genuine \emph{time-expanded} geodesic body --
+flooding $(x,y,t)$ directly, with every predicted obstacle at once, instead
+of a per-branch triggered search -- changes the conclusion, and whether that
+conclusion holds as obstacle density rises. We implemented this extension
+(\emph{the space--time blob}) in both the reference sandbox and the Nav2
+port: the local body, membrane and pseudopods of
+Section~\ref{sec:method-distinct} are re-derived over a light-cone grid
+$(2K{+}1)^2$ cells, $K=\lceil T_{\mathrm{h}}/\Delta t_\ell\rceil$, with one
+cell of motion permitted per time layer and free\-/blocked evaluated against
+every tracked obstacle's constant-velocity prediction
+(Eq.~\ref{eq:cv-prediction}) simultaneously. Candidate exits on the final
+layer are ranked by space--time cost plus the static water level as a
+terminal cost-to-go, and pseudopods are chosen by homotopy class
+(Eq.~\ref{eq:winding}) before falling back to spatial separation. Two
+integration modes were evaluated: adding up to two extra proposals in the
+same way as the triggered search (\emph{blob-extras}), and replacing the
+three ordinary pseudopod slots with the blob's own routes while a hysteresis
+gate judges the obstacles to matter (\emph{blob-pods}). Both are gated off
+by default and add no measurable cost when inactive ($<2\,\mathrm{ms}$ build
+time when active).
+
+To test density, three additional five-obstacle scenes from
+Section~\ref{sec:setup} were extended to 15 and 20 obstacles
+using the same generator and constraints (Section~\ref{sec:setup}),
+giving matched scenes that differ only in obstacle count. Table~\ref{tab:blob}
+reports legs completed and legs with contact for B (unmodified TG-MPPI),
+blob-extras, blob-pods, and a GPU-backend twin of B, at 10, 15 and 20
+obstacles (2 repetitions per world; this is a smaller, exploratory run and
+p-values should be read as indicative, not as a powered test).
+
+\begin{table}[t]
+\centering
+\caption{Legs completed by obstacle density (10/15/20 obstacles), space-time
+blob variants. B is unmodified TG-MPPI (Table~\ref{tab:main}); B$_{\mathrm
+g}$ is B on the CUDA backend; blob-extras and blob-pods are the two
+space-time-blob integration modes.}
+\label{tab:blob}
+\begin{tabular}{lccc}
+\toprule
+Condition & 10 obstacles & 15 obstacles & 20 obstacles \\
+\midrule
+B              & 24/24 (100\%) & 10/14 (71\%) & 11/14 (79\%) \\
+B$_{\mathrm g}$& 24/24 (100\%) & 13/15 (87\%) & \phantom{0}7/12 (58\%) \\
+Blob-extras    & 23/24 (96\%)  & \phantom{0}8/14 (57\%) & \phantom{0}5/12 (42\%) \\
+Blob-pods      & 24/24 (100\%) & 12/15 (80\%) & \phantom{0}3/11 (27\%) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=0.92\textwidth]{figures/spacetime_flood_filmstrip.png}
+  \caption{The mechanism the space--time blob generalises: flooding $(x,y,t)$
+  keeps the full reachable set at every time layer, not just two candidate
+  routes through it (reference-sandbox prototype, single synthetic obstacle,
+  \SI{4}{\second} horizon, \SI{0.2}{\second} layers). The reachable region
+  grows from the robot's start (darker = fewer layers elapsed) and is bitten
+  into by the obstacle's own moving footprint (gray disc) as the flood
+  advances -- the same notch that separates the wait and detour homotopy
+  classes extracted by \texttt{SpaceTimeBody} (Section~\ref{sec:blob-density}).
+  Shown for intuition; the quantitative claims of
+  Section~\ref{sec:blob-density} come only from the matched Gazebo and
+  sandbox panels.}
+  \label{fig:spacetime-flood-mechanism}
+\end{figure*}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\columnwidth]{figures/spacetime_flood_volume.png}
+  \caption{The same flood as a stack of time layers in $(x,y,t)$. Each
+  translucent sheet is one layer's reachable set (Fig.~\ref{fig:spacetime-flood-mechanism}
+  collapsed to a single instant); the dotted line is the moving obstacle's
+  own trajectory traced through time, i.e.\ the exclusion tube each layer's
+  notch is a cross-section of. A route that stays on one side of the tube
+  throughout is one homotopy class; a route that crosses to the other side
+  is distinct under Eq.~\ref{eq:winding}.}
+  \label{fig:spacetime-flood-volume}
+\end{figure}
+
+At 10 obstacles every condition matches or is within one leg of B, consistent
+with Table~\ref{tab:main}: the blob changes nothing when the scene is easy.
+As density rises, both blob variants fall further behind B rather than
+closing the gap, and blob-pods -- the mode that most changes the sampling
+distribution -- degrades fastest, from matching B at 15 obstacles to the
+worst result of any condition at 20 (27\% legs completed, 64\% of legs with
+at least one contact, $9.3$ recoveries per leg). Paired against B leg-by-leg
+on the dense scenes, none of the three variants differs from B beyond what
+this sample size can resolve (McNemar exact, blob-extras $p=0.39$, blob-pods
+$p=0.55$, B$_{\mathrm g}$ $p=1.0$), but the direction is consistent with an
+independent reference-sandbox panel (240 episodes, N$\in\{10,20,30\}$ random
+waypoint-moving obstacles, 20 seeds per cell), where the blob likewise
+tracked the existing wait/detour mechanism rather than improving on it
+(pooled $N{\ge}20$: base 27/40, blob-pods 30/40, $p=0.45$). We therefore do
+not adopt the space--time blob: across four independent tests -- the sandbox
+panel, two single-scene Gazebo probes, and this density sweep -- it never
+separates from the existing method, and in the one setting it changes the
+most (dense scenes with the pseudopod slots replaced) it is measurably worse.
+It is reported here as an implemented and evaluated negative result rather
+than included in the method under test.
+
+The CUDA backend (B$_{\mathrm g}$) shows no consistent advantage either: mean
+cycle time was \SI{21.1}{\milli\second}, statistically indistinguishable from
+B's CPU cycle time in this run, because trajectory noise generation and the
+softmax weighting update remain CPU-bound in the current port and the
+predicted-obstacle critic is CPU-only under both backends. GPU offload
+therefore accelerates the critics it covers without yet changing wall-clock
+behaviour end to end; a port of the remaining CPU stages is future work.
 
 \section{Discussion and Limitations}
+\label{sec:discussion}
 The ablation is designed to prevent a useful prediction mechanism from being
 mistaken for evidence of topological reasoning: condition D receives the same
 predicted-obstacle critic as TG-MPPI but no pseudopod or space--time proposal.
-Whether topology adds measurable value must therefore be inferred from B versus
-D in the corrected winding-test run, not from TG-MPPI versus the stock
-baseline. A non-significant B--D difference would be a null result for this
-benchmark and sample size, not proof that topology can never help. Resolving a
-small effect would require more repetitions and scenes deliberately containing
-two feasible classes with different temporal consequences.
+Topology is therefore assessed from B versus D in the corrected winding-test
+run, not from TG-MPPI versus the stock baseline. That comparison is a null
+result: the observed 1.7-point success difference is negligible relative to its
+wide $[-18.3,23.3]$-point interval, while the computational overhead is clear.
+This is not proof that topology can never help. Resolving a modest effect would
+require more repetitions and scenes deliberately containing two feasible
+classes with different temporal consequences; the present five scenarios do
+not provide that evidence.
 
 Scenario coverage is limited to five scripted obstacle patterns over one map.
 Although restarting Gazebo and fixing the first-goal simulation time makes
@@ -645,14 +1201,21 @@ geodesic flood field into collision-validated ancillary MPPI proposals and can
 augment them with time-expanded wait/detour routes. A reproducible Gazebo
 benchmark compares it with an untouched stock Nav2 MPPI controller and, through
 a prediction-only condition, separates obstacle prediction from topology.
-\pending{Replace with the final quantitative conclusion from
-\texttt{thesis\_dyn\_winding}: state the stock-baseline gain, then state whether
-B separated from D under the corrected winding classifier.}
+TG-MPPI completed 54/60 planned dynamic-obstacle legs compared with 17/60 for
+stock MPPI, but prediction-only MPPI completed 53/60. With winding-based route
+classification, TG-MPPI remained statistically indistinguishable from the
+prediction-only control on success, clearance and speed while costing an
+additional \SI{4.28}{\milli\second} per cycle. The defensible conclusion is
+therefore that predicted-obstacle handling explains the measured improvement;
+the topological proposal layer is implemented and occasionally active, but its
+navigation benefit was not demonstrated by this benchmark.
 The result should be interpreted within the limits of perfect obstacle
 tracking, five simulated scenarios and no physical-robot validation.
 
 \section*{Acknowledgment}
-\todo{supervisor, lab, compute.}
+The author thanks his supervisor, Dr.\ Laura Ferranti (R2C Lab, Delft
+University of Technology, e-mail: L.Ferranti@tudelft.nl), for her guidance
+throughout this project.
 
 \bibliographystyle{IEEEtran}
 \bibliography{refs}

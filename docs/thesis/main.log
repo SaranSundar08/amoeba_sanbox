@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2026.9.20)  20 SEP 2026 19:32
+This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2026.9.20)  23 SEP 2026 21:12
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -326,6 +326,44 @@ File: l3backend-pdftex.def 2022-01-12 L3 backend support: PDF output (pdfTeX)
 ))
 Package: l3keys2e 2022-01-12 LaTeX2e option processing using LaTeX3 keys
 ))
+(/usr/share/texlive/texmf-dist/tex/latex/algorithms/algorithm.sty
+Package: algorithm 2009/08/24 v0.1 Document Style `algorithm' - floating enviro
+nment
+
+(/usr/share/texlive/texmf-dist/tex/latex/float/float.sty
+Package: float 2001/11/08 v1.3d Float enhancements (AL)
+\c@float@type=\count294
+\float@exts=\toks25
+\float@box=\box64
+\@float@everytoks=\toks26
+\@floatcapt=\box65
+)
+(/usr/share/texlive/texmf-dist/tex/latex/base/ifthen.sty
+Package: ifthen 2020/11/24 v1.1c Standard LaTeX ifthen package (DPC)
+)
+\@float@every@algorithm=\toks27
+\c@algorithm=\count295
+)
+(/usr/share/texlive/texmf-dist/tex/latex/algorithmicx/algpseudocode.sty
+Package: algpseudocode 
+
+(/usr/share/texlive/texmf-dist/tex/latex/algorithmicx/algorithmicx.sty
+Package: algorithmicx 2005/04/27 v1.2 Algorithmicx
+
+Document Style algorithmicx 1.2 - a greatly improved `algorithmic' style
+\c@ALG@line=\count296
+\c@ALG@rem=\count297
+\c@ALG@nested=\count298
+\ALG@tlm=\skip56
+\ALG@thistlm=\skip57
+\c@ALG@Lnr=\count299
+\c@ALG@blocknr=\count300
+\c@ALG@storecount=\count301
+\c@ALG@tmpcounter=\count302
+\ALG@tmplength=\skip58
+)
+Document Style - pseudocode environments for use with the `algorithmicx' style
+)
 
 Package siunitx Info: Option "detect-weight" has been deprecated in this
 (siunitx)             release.
@@ -341,40 +379,39 @@ Package siunitx Info: Option "detect-family" has been deprecated in this
 (siunitx)             true" as a replacement.
 
 Package translations Info: No language package found. I am going to use `englis
-h' as default language. on input line 19.
-
-(./main.aux)
+h' as default language. on input line 21.
+ (./main.aux)
 \openout1 = `main.aux'.
 
-LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 19.
-LaTeX Font Info:    ... okay on input line 19.
-LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 19.
-LaTeX Font Info:    ... okay on input line 19.
-LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 19.
-LaTeX Font Info:    ... okay on input line 19.
-LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 19.
-LaTeX Font Info:    ... okay on input line 19.
-LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 19.
-LaTeX Font Info:    ... okay on input line 19.
-LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 19.
-LaTeX Font Info:    ... okay on input line 19.
-LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 19.
-LaTeX Font Info:    ... okay on input line 19.
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 21.
+LaTeX Font Info:    ... okay on input line 21.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 21.
+LaTeX Font Info:    ... okay on input line 21.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 21.
+LaTeX Font Info:    ... okay on input line 21.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 21.
+LaTeX Font Info:    ... okay on input line 21.
+LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 21.
+LaTeX Font Info:    ... okay on input line 21.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 21.
+LaTeX Font Info:    ... okay on input line 21.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 21.
+LaTeX Font Info:    ... okay on input line 21.
 
 -- Lines per column: 58 (exact).
 (/usr/share/texlive/texmf-dist/tex/context/base/mkii/supp-pdf.mkii
 [Loading MPS to PDF converter (version 2006.09.02).]
-\scratchcounter=\count294
+\scratchcounter=\count303
 \scratchdimen=\dimen193
-\scratchbox=\box64
-\nofMPsegments=\count295
-\nofMParguments=\count296
-\everyMPshowfont=\toks25
-\MPscratchCnt=\count297
+\scratchbox=\box66
+\nofMPsegments=\count304
+\nofMParguments=\count305
+\everyMPshowfont=\toks28
+\MPscratchCnt=\count306
 \MPscratchDim=\dimen194
-\MPnumerator=\count298
-\makeMPintoPDFobject=\count299
-\everyMPtoPDFconversion=\toks26
+\MPnumerator=\count307
+\makeMPintoPDFobject=\count308
+\everyMPtoPDFconversion=\toks29
 ) (/usr/share/texlive/texmf-dist/tex/latex/epstopdf-pkg/epstopdf-base.sty
 Package: epstopdf-base 2020-01-24 v2.11 Base part for package epstopdf
 Package epstopdf-base Info: Redefining graphics rule for `.eps' on input line 4
@@ -390,124 +427,182 @@ File: translations-basic-dictionary-english.trsl (english translation file `tra
 nslations-basic-dictionary')
 )
 Package translations Info: loading dictionary `translations-basic-dictionary' f
-or `english'. on input line 19.
+or `english'. on input line 21.
+<figures/multimodal_trajectory_motivation.png, id=1, 734.745pt x 931.48pt>
+File: figures/multimodal_trajectory_motivation.png Graphic file (type png)
+<use figures/multimodal_trajectory_motivation.png>
+Package pdftex.def Info: figures/multimodal_trajectory_motivation.png  used on 
+input line 88.
+(pdftex.def)             Requested size: 120.95892pt x 153.34645pt.
+ [1{/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map}
 
-Underfull \hbox (badness 7667) in paragraph at lines 104--112
-[]\OT1/ptm/m/n/10 MPPI casts finite-horizon stochas-tic con-trol as an
- []
 
-[1{/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map}
-
-
-]
-LaTeX Font Info:    Trying to load font information for U+msa on input line 148
+ <./figures/multimodal_trajectory_motivation.png>] [2]
+LaTeX Font Info:    Trying to load font information for U+msa on input line 260
 .
 
 (/usr/share/texlive/texmf-dist/tex/latex/amsfonts/umsa.fd
 File: umsa.fd 2013/01/14 v3.01 AMS symbols A
 )
-LaTeX Font Info:    Trying to load font information for U+msb on input line 148
+LaTeX Font Info:    Trying to load font information for U+msb on input line 260
 .
 
 (/usr/share/texlive/texmf-dist/tex/latex/amsfonts/umsb.fd
 File: umsb.fd 2013/01/14 v3.01 AMS symbols B
-) [2]
-<../../artifacts/images/demos/amoeba_motion_sequence.png, id=23, 1027.3751pt x 
+)
+Overfull \hbox (12.85797pt too wide) in paragraph at lines 260--290
+ [][] 
+ []
+
+[3]
+<figures/tg_mppi_flowchart.png, id=29, 1678.27pt x 944.52875pt>
+File: figures/tg_mppi_flowchart.png Graphic file (type png)
+<use figures/tg_mppi_flowchart.png>
+Package pdftex.def Info: figures/tg_mppi_flowchart.png  used on input line 412.
+
+(pdftex.def)             Requested size: 495.36346pt x 278.7921pt.
+<../../artifacts/images/demos/amoeba_motion_sequence.png, id=30, 1027.3751pt x 
 396.34389pt>
 File: ../../artifacts/images/demos/amoeba_motion_sequence.png Graphic file (typ
 e png)
 <use ../../artifacts/images/demos/amoeba_motion_sequence.png>
 Package pdftex.def Info: ../../artifacts/images/demos/amoeba_motion_sequence.pn
-g  used on input line 297.
+g  used on input line 460.
 (pdftex.def)             Requested size: 516.0pt x 199.07256pt.
- [3]
-<../../artifacts/images/demos/spacetime_topology.png, id=31, 793.40741pt x 550.
+ [4] [5 <./figures/tg_mppi_flowchart.png (PNG copy)>]
+Underfull \hbox (badness 10000) in paragraph at lines 614--615
+[] \OT1/ptm/b/n/10 if $\OML/cmm/m/it/10 ^^V[]$ \OT1/ptm/m/n/10 fea-si-ble and \
+OT1/ptm/m/sc/10 Op-po-siteWind-
+ []
+
+
+Underfull \vbox (badness 3492) has occurred while \output is active []
+
+<../../artifacts/images/demos/spacetime_topology.png, id=48, 793.40741pt x 550.
 81459pt>
 File: ../../artifacts/images/demos/spacetime_topology.png Graphic file (type pn
 g)
 <use ../../artifacts/images/demos/spacetime_topology.png>
 Package pdftex.def Info: ../../artifacts/images/demos/spacetime_topology.png  u
-sed on input line 395.
+sed on input line 632.
 (pdftex.def)             Requested size: 392.15717pt x 272.25484pt.
-LaTeX Font Info:    Trying to load font information for OT1+pcr on input line 4
-29.
+
+Underfull \vbox (badness 2961) has occurred while \output is active []
+
+ [6 <../../artifacts/images/demos/amoeba_motion_sequence.png>]
+LaTeX Font Info:    Trying to load font information for OT1+pcr on input line 6
+66.
 
 (/usr/share/texlive/texmf-dist/tex/latex/psnfss/ot1pcr.fd
 File: ot1pcr.fd 2001/06/04 font definitions for OT1/pcr.
 )
-Underfull \hbox (badness 10000) in paragraph at lines 429--433
+Underfull \hbox (badness 10000) in paragraph at lines 666--670
 []\OT1/ptm/m/n/10 TG-MPPI is im-ple-mented as a
  []
 
-
-Underfull \hbox (badness 1389) in paragraph at lines 455--461
+[7 <../../artifacts/images/demos/spacetime_topology.png>]
+Underfull \hbox (badness 1389) in paragraph at lines 732--738
 []\OT1/ptm/m/n/10 The al-go-rithm was first de-vel-oped in an in-de-pen-dent
  []
 
-[4 <../../artifacts/images/demos/amoeba_motion_sequence.png>]
-<figures/benchmark_route_dyn.pdf, id=37, 462.52798pt x 549.25201pt>
+
+Overfull \hbox (13.86337pt too wide) in paragraph at lines 768--799
+ [][] 
+ []
+
+<figures/benchmark_route_dyn.pdf, id=59, 462.52798pt x 549.25201pt>
 File: figures/benchmark_route_dyn.pdf Graphic file (type pdf)
 <use figures/benchmark_route_dyn.pdf>
-Package pdftex.def Info: figures/benchmark_route_dyn.pdf  used on input line 49
-2.
+Package pdftex.def Info: figures/benchmark_route_dyn.pdf  used on input line 80
+9.
 (pdftex.def)             Requested size: 252.0pt x 299.25679pt.
- [5 <../../artifacts/images/demos/spacetime_topology.png>]
-Underfull \hbox (badness 10000) in paragraph at lines 590--596
-\OT1/ptm/b/n/10 number re-run; re-gen-er-ate this sub-sec-tion from
+[8]
+<../../artifacts/images/experiments/final/static_success_clearance.png, id=63, 
+751.30687pt x 295.1025pt>
+File: ../../artifacts/images/experiments/final/static_success_clearance.png Gra
+phic file (type png)
+<use ../../artifacts/images/experiments/final/static_success_clearance.png>
+Package pdftex.def Info: ../../artifacts/images/experiments/final/static_succes
+s_clearance.png  used on input line 916.
+(pdftex.def)             Requested size: 252.0pt x 98.98264pt.
+ [9 <./figures/benchmark_route_dyn.pdf>]
+<../../artifacts/images/experiments/final/blocked_attribution.png, id=149, 751.
+30687pt x 272.51813pt>
+File: ../../artifacts/images/experiments/final/blocked_attribution.png Graphic 
+file (type png)
+<use ../../artifacts/images/experiments/final/blocked_attribution.png>
+Package pdftex.def Info: ../../artifacts/images/experiments/final/blocked_attri
+bution.png  used on input line 954.
+(pdftex.def)             Requested size: 252.0pt x 91.40744pt.
+
+Underfull \hbox (badness 1460) in paragraph at lines 960--967
+[]\OT1/ptm/m/n/10 Isolated se-rial tim-ing was 31.45, 109.60, 133.80 and
+ []
+
+[10 <../../artifacts/images/experiments/final/static_success_clearance.png> <..
+/../artifacts/images/experiments/final/blocked_attribution.png>]
+<figures/spacetime_flood_filmstrip.png, id=155, 1089.57652pt x 557.32924pt>
+File: figures/spacetime_flood_filmstrip.png Graphic file (type png)
+<use figures/spacetime_flood_filmstrip.png>
+Package pdftex.def Info: figures/spacetime_flood_filmstrip.png  used on input l
+ine 1104.
+(pdftex.def)             Requested size: 474.71906pt x 242.81894pt.
+<figures/spacetime_flood_volume.png, id=156, 474.50417pt x 512.49754pt>
+File: figures/spacetime_flood_volume.png Graphic file (type png)
+<use figures/spacetime_flood_volume.png>
+Package pdftex.def Info: figures/spacetime_flood_volume.png  used on input line
+ 1121.
+(pdftex.def)             Requested size: 252.0pt x 272.17763pt.
+ [11]
+Underfull \hbox (badness 6658) in paragraph at lines 1216--1219
+[]\OT1/ptm/m/n/10 The au-thor thanks his su-per-vi-sor, Dr. Laura Fer-
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 590--596
-\OT1/pcr/b/n/10 thesis_dyn_winding \OT1/ptm/b/n/10 be-fore sub-mis-sion.][] \OT
-1/ptm/m/n/10 Across
+Underfull \hbox (badness 3240) in paragraph at lines 1216--1219
+\OT1/ptm/m/n/10 L.Ferranti@tudelft.nl), for her guid-ance through-out this
  []
 
-[6 <./figures/benchmark_route_dyn.pdf>]
-Underfull \hbox (badness 1838) in paragraph at lines 643--653
-\OT1/ptm/m/n/10 bench-mark com-pares it with an un-touched stock Nav2
- []
+(./main.bbl [12 <./figures/spacetime_flood_filmstrip.png>]) [13
 
-
-Underfull \hbox (badness 1715) in paragraph at lines 643--653
-\OT1/ptm/b/n/10 Re-place with the fi-nal quan-ti-ta-tive con-clu-sion from
- []
-
-(./main.bbl) [7] (./main.aux) ) 
+ <./figures/spacetime_flood_volume.png>] (./main.aux) ) 
 Here is how much of TeX's memory you used:
- 8213 strings out of 480171
- 178843 string characters out of 5894489
- 458313 words of memory out of 5000000
- 26065 multiletter control sequences out of 15000+600000
- 515538 words of font info for 121 fonts, out of 8000000 for 9000
+ 8989 strings out of 480171
+ 192872 string characters out of 5894489
+ 474339 words of memory out of 5000000
+ 26814 multiletter control sequences out of 15000+600000
+ 517543 words of font info for 125 fonts, out of 8000000 for 9000
  59 hyphenation exceptions out of 8191
- 71i,14n,79p,466b,663s stack positions out of 5000i,500n,10000p,200000b,80000s
-{/usr/share/texlive/texmf-dist/fonts/enc/dvips/b
-ase/8r.enc}</usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10
-.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb><
-/usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/s
-hare/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi5.pfb></usr/share/te
-xlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi7.pfb></usr/share/texlive/t
-exmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></usr/share/texlive/texmf-di
-st/fonts/type1/public/amsfonts/cm/cmmib10.pfb></usr/share/texlive/texmf-dist/fo
-nts/type1/public/amsfonts/cm/cmr10.pfb></usr/share/texlive/texmf-dist/fonts/typ
-e1/public/amsfonts/cm/cmr6.pfb></usr/share/texlive/texmf-dist/fonts/type1/publi
-c/amsfonts/cm/cmr7.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfon
-ts/cm/cmr8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cm
-sy10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy5.pf
-b></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy6.pfb></usr
-/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy7.pfb></usr/share/
-texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy8.pfb></usr/share/texlive
-/texmf-dist/fonts/type1/public/amsfonts/symbols/msam7.pfb></usr/share/texlive/t
-exmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb></usr/share/texlive/te
-xmf-dist/fonts/type1/urw/courier/ucrb8a.pfb></usr/share/texlive/texmf-dist/font
-s/type1/urw/courier/ucrr8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/t
-imes/utmb8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/times/utmbi8a.pf
-b></usr/share/texlive/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></usr/share/t
-exlive/texmf-dist/fonts/type1/urw/times/utmri8a.pfb>
-Output written on main.pdf (7 pages, 1591348 bytes).
+ 71i,15n,79p,889b,700s stack positions out of 5000i,500n,10000p,200000b,80000s
+{/usr/share/texlive/texm
+f-dist/fonts/enc/dvips/base/8r.enc}</usr/share/texlive/texmf-dist/fonts/type1/p
+ublic/amsfonts/cm/cmbx10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/
+amsfonts/cm/cmbx8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfont
+s/cm/cmex10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/c
+mmi10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi5.p
+fb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi6.pfb></us
+r/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi7.pfb></usr/share
+/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></usr/share/texliv
+e/texmf-dist/fonts/type1/public/amsfonts/cm/cmmib10.pfb></usr/share/texlive/tex
+mf-dist/fonts/type1/public/amsfonts/cmextra/cmmib8.pfb></usr/share/texlive/texm
+f-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/share/texlive/texmf-dist/
+fonts/type1/public/amsfonts/cm/cmr6.pfb></usr/share/texlive/texmf-dist/fonts/ty
+pe1/public/amsfonts/cm/cmr7.pfb></usr/share/texlive/texmf-dist/fonts/type1/publ
+ic/amsfonts/cm/cmr8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfo
+nts/cm/cmsy10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm
+/cmsy5.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy6.
+pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy7.pfb></u
+sr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy8.pfb></usr/shar
+e/texlive/texmf-dist/fonts/type1/public/amsfonts/symbols/msam7.pfb></usr/share/
+texlive/texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb></usr/share/t
+exlive/texmf-dist/fonts/type1/urw/courier/ucrr8a.pfb></usr/share/texlive/texmf-
+dist/fonts/type1/urw/times/utmb8a.pfb></usr/share/texlive/texmf-dist/fonts/type
+1/urw/times/utmbi8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/times/ut
+mr8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/times/utmri8a.pfb>
+Output written on main.pdf (13 pages, 3745672 bytes).
 PDF statistics:
- 238 PDF objects out of 1000 (max. 8388607)
- 109 compressed objects within 2 object streams
+ 278 PDF objects out of 1000 (max. 8388607)
+ 128 compressed objects within 2 object streams
  0 named destinations out of 1000 (max. 500000)
- 16 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 46 words of extra memory for PDF output out of 10000 (max. 10000000)
 
