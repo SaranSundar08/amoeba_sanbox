@@ -163,9 +163,34 @@ def main():
     p.add_argument("--replan-every", type=float, default=0.0, metavar="SECONDS",
                    help="hybrid: periodically rerun A* from the current pose; "
                         "0 disables replanning")
+    p.add_argument("--random-dynamic", type=int, default=None, metavar="N",
+                   help="open room (randdyn.RandomDynEnv, like the Gazebo dyn worlds) with N "
+                        "RANDOMLY moving obstacles instead of a BARN world; seeded by "
+                        "--dyn-seed (default: derived from --seed). Needs --renderer pyqtgraph")
+    p.add_argument("--motion", choices=("waypoint", "bounce"), default="waypoint",
+                   help="--random-dynamic: random-waypoint (velocity changes) or bounce")
+    p.add_argument("--obstacle-speed", type=float, nargs=2, default=(0.15, 0.40),
+                   metavar=("MIN", "MAX"), help="--random-dynamic: obstacle speed range (m/s)")
+    p.add_argument("--samples", type=int, default=None, metavar="K",
+                   help="MPPI samples per step (default 1024, ~166 ms/step in Python at 20 "
+                        "obstacles = ~3x slower than real time). --samples 256 is ~real time; "
+                        "fine for WATCHING, but use the default for any reported result")
+    p.add_argument("--spacetime-blob", choices=("extras", "pods"), default=None,
+                   help="space-time blob (spacetime_blob.py): 'extras' adds 2 modes, 'pods' "
+                        "replaces the pseudopod modes while moving obstacles matter. Needs "
+                        "--grouped-sampling; drawn in the pyqtgraph animation")
     args = p.parse_args()
 
-    if args.dynamic:
+    if args.random_dynamic is not None:
+        if args.png or (args.animate and args.renderer == "matplotlib"):
+            p.error("--random-dynamic is only supported with the pyqtgraph renderer")
+        from randdyn import RandomDynEnv
+        dyn_seed = (args.dyn_seed if args.dyn_seed is not None
+                    else args.world * 7919 + args.seed)
+        env = RandomDynEnv(n_moving=args.random_dynamic, seed=dyn_seed, motion=args.motion,
+                           speed_range=tuple(args.obstacle_speed), robot_r=args.radius)
+        args.dynamic = True        # downstream checks (--predict-dynamic, --spacetime-modes)
+    elif args.dynamic:
         from dynabarn import DynaBarnEnv
         dyn_seed = (args.dyn_seed if args.dyn_seed is not None
                    else args.world * 7919 + args.seed)
@@ -194,6 +219,8 @@ def main():
         prediction_uncertainty_rate=args.prediction_uncertainty)
     if args.predict_dynamic and not args.dynamic:
         p.error("--predict-dynamic requires --dynamic")
+    if args.samples is not None:
+        vkw["K"] = args.samples
     if args.viscosity is not None and args.controller in ("local", "hybrid"):
         vkw["viscosity"] = args.viscosity
     if args.window is not None and args.controller in ("local", "hybrid"):
@@ -215,6 +242,10 @@ def main():
         vkw["mode_switch_margin"] = args.switch_margin
         vkw["homotopy_w"] = args.homotopy_w
         vkw["homotopy_monitor"] = args.homotopy_monitor
+        if args.spacetime_blob:
+            if not args.dynamic:
+                p.error("--spacetime-blob requires --dynamic or --random-dynamic")
+            vkw["spacetime_blob"] = args.spacetime_blob
         if args.spacetime_modes:
             if not args.dynamic:
                 p.error("--spacetime-modes requires --dynamic")
@@ -231,6 +262,8 @@ def main():
         p.error("--homotopy-w/--homotopy-monitor require --grouped-sampling")
     elif args.spacetime_modes:
         p.error("--spacetime-modes requires --pseudopods/--grouped-sampling")
+    elif args.spacetime_blob:
+        p.error("--spacetime-blob requires --grouped-sampling")
     if args.reference_policy == "nominal_fb":
         if not (args.pseudopods or args.grouped_sampling):
             p.error("--reference-policy nominal_fb requires --pseudopods or "
@@ -285,7 +318,8 @@ def main():
         from pyqtgraph_visualization import PyQtGraphAnimator
         try:
             animator = PyQtGraphAnimator(
-                env, ctrl, path, args.world, every=args.every,
+                env, ctrl, path, "open" if args.random_dynamic is not None else args.world,
+                every=args.every,
                 mode_debug_every=args.mode_debug_every)
         except RuntimeError as error:
             p.error(str(error))

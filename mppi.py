@@ -15,6 +15,7 @@ from proposals import _arc_length, _interpolate, branch_to_control_sequence
 from robot_model import RobotModel
 from spacetime import (nearest_crossing_obstacle, spacetime_path_to_proposal,
                        two_route_search)
+from spacetime_blob import BlobPlanner
 from spacetime_flow import SpaceTimeFlood
 from grouped_sampling import (
     SamplingMode, guard_importance_statistics, importance_mode_statistics,
@@ -52,6 +53,8 @@ class MPPI:
                  spacetime_flow_obstacle_r=0.075, spacetime_flow_horizon=None,
                  spacetime_flow_dt_layer=0.25, spacetime_flow_res=0.10,
                  spacetime_flow_window=1.0,
+                 spacetime_blob=None, blob_gate=0.2, blob_margin=0.10,
+                 blob_max_regret=1.0,
                  mode_switch_margin=0.3,
                  fallback_share=0.25, mode_warm_start=0.7,
                  mode_min_dwell=10, mode_confirm_cycles=3,
@@ -143,6 +146,13 @@ class MPPI:
         self.spacetime_flow_res = float(spacetime_flow_res)
         self.spacetime_flow_window = float(spacetime_flow_window)
         self._spacetime_flood = None
+        # Space-time BLOB (spacetime_blob.py; sandbox reference for the C++ branch
+        # space-time-blob): None = off (identical to before), "extras" = 2 extra modes,
+        # "pods" = the blob's routes replace the static pseudopod modes while moving
+        # obstacles matter (`blob_gate` metres of extra best-route cost).
+        self.blob = (None if spacetime_blob in (None, False, "off") else BlobPlanner(
+            mode=spacetime_blob, gate=blob_gate, margin=blob_margin,
+            max_regret=blob_max_regret))
         self._spacetime_flood_age = 0
         self.spacetime_flow_build_ms = []
         self.robot_model = RobotModel(
@@ -697,6 +707,8 @@ class MPPI:
             proposals.append(proposal)
             proposals.extend(
                 self._spacetime_alternatives(state, branch, proposal))
+        if self.blob is not None:
+            proposals = self.blob.propose(self, state, proposals)
         self.branch_proposals = proposals
         if hasattr(self, "proposal_ms"):
             self.proposal_ms.append((time.perf_counter() - t0) * 1e3)

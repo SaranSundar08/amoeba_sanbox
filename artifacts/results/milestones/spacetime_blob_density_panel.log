@@ -1,0 +1,257 @@
+240 episodes, 14 jobs
+[   1/240] N=10 seed= 0 base         success   clear= 0.401 t= 22.6s active=0/0
+[   2/240] N=10 seed= 0 modes        success   clear= 0.401 t= 22.7s active=0/0
+[   3/240] N=10 seed= 0 blob_extras  success   clear= 0.401 t= 22.6s active=0/453
+[   4/240] N=10 seed= 0 blob_pods    success   clear= 0.401 t= 22.6s active=0/453
+[   5/240] N=10 seed= 1 base         success   clear= 0.233 t= 26.0s active=0/0
+[   6/240] N=10 seed= 1 modes        success   clear= 0.210 t= 25.6s active=0/0
+[   7/240] N=10 seed= 1 blob_extras  success   clear= 0.233 t= 26.0s active=0/520
+[   8/240] N=10 seed= 1 blob_pods    success   clear= 0.233 t= 26.0s active=0/520
+[   9/240] N=10 seed= 2 base         success   clear= 0.217 t= 30.7s active=0/0
+[  10/240] N=10 seed= 2 modes        success   clear= 0.215 t= 30.6s active=0/0
+[  11/240] N=10 seed= 2 blob_extras  success   clear= 0.217 t= 31.1s active=35/622
+[  12/240] N=10 seed= 2 blob_pods    success   clear= 0.191 t= 30.8s active=39/616
+[  13/240] N=10 seed= 3 base         success   clear= 0.168 t= 31.8s active=0/0
+[  14/240] N=10 seed= 3 modes        success   clear= 0.180 t= 31.6s active=0/0
+[  15/240] N=10 seed= 3 blob_extras  success   clear= 0.179 t= 33.4s active=85/668
+[  16/240] N=10 seed= 3 blob_pods    success   clear= 0.116 t= 35.1s active=120/702
+[  17/240] N=10 seed= 4 base         success   clear= 0.191 t= 31.3s active=0/0
+[  18/240] N=10 seed= 4 modes        success   clear= 0.129 t= 30.2s active=0/0
+[  19/240] N=10 seed= 4 blob_extras  success   clear= 0.124 t= 35.6s active=215/712
+[  20/240] N=10 seed= 4 blob_pods    success   clear= 0.171 t= 33.5s active=115/669
+[  21/240] N=10 seed= 5 base         success   clear= 0.145 t= 24.3s active=0/0
+[  22/240] N=10 seed= 5 modes        success   clear= 0.145 t= 24.4s active=0/0
+[  23/240] N=10 seed= 5 blob_extras  success   clear= 0.145 t= 24.3s active=0/486
+[  24/240] N=10 seed= 5 blob_pods    success   clear= 0.145 t= 24.3s active=0/486
+[  25/240] N=10 seed= 6 base         success   clear= 0.112 t= 30.9s active=0/0
+[  26/240] N=10 seed= 6 modes        success   clear= 0.121 t= 25.4s active=0/0
+[  27/240] N=10 seed= 6 blob_extras  success   clear= 0.112 t= 26.1s active=171/521
+[  28/240] N=10 seed= 6 blob_pods    success   clear= 0.118 t= 26.1s active=121/522
+[  29/240] N=10 seed= 7 base         success   clear= 0.119 t= 26.4s active=0/0
+[  30/240] N=10 seed= 7 modes        success   clear= 0.121 t= 26.1s active=0/0
+[  31/240] N=10 seed= 7 blob_extras  success   clear= 0.119 t= 26.4s active=0/527
+[  32/240] N=10 seed= 7 blob_pods    success   clear= 0.119 t= 26.4s active=0/527
+[  33/240] N=10 seed= 8 base         success   clear= 0.153 t= 28.9s active=0/0
+[  34/240] N=10 seed= 8 modes        success   clear= 0.118 t= 28.9s active=0/0
+[  35/240] N=10 seed= 8 blob_extras  success   clear= 0.063 t= 36.6s active=149/733
+[  36/240] N=10 seed= 8 blob_pods    success   clear= 0.075 t= 36.8s active=135/736
+[  37/240] N=10 seed= 9 base         success   clear= 0.249 t= 24.1s active=0/0
+[  38/240] N=10 seed= 9 modes        success   clear= 0.225 t= 23.9s active=0/0
+[  39/240] N=10 seed= 9 blob_extras  success   clear= 0.249 t= 24.1s active=0/482
+[  40/240] N=10 seed= 9 blob_pods    success   clear= 0.249 t= 24.1s active=0/482
+[  41/240] N=10 seed=10 base         success   clear= 0.142 t= 23.9s active=0/0
+[  42/240] N=10 seed=10 modes        success   clear= 0.154 t= 24.0s active=0/0
+[  43/240] N=10 seed=10 blob_extras  success   clear= 0.151 t= 24.1s active=31/481
+[  44/240] N=10 seed=10 blob_pods    success   clear= 0.181 t= 24.7s active=21/494
+[  45/240] N=10 seed=11 base         success   clear= 0.196 t= 35.3s active=0/0
+[  46/240] N=10 seed=11 modes        success   clear= 0.150 t= 35.4s active=0/0
+[  47/240] N=10 seed=11 blob_extras  success   clear= 0.145 t= 28.6s active=58/571
+[  48/240] N=10 seed=11 blob_pods    success   clear= 0.124 t= 29.4s active=76/588
+[  49/240] N=10 seed=12 base         success   clear= 0.128 t= 30.9s active=0/0
+[  50/240] N=10 seed=12 modes        success   clear= 0.115 t= 30.1s active=0/0
+[  51/240] N=10 seed=12 blob_extras  success   clear= 0.128 t= 29.9s active=154/597
+[  52/240] N=10 seed=12 blob_pods    success   clear= 0.145 t= 29.8s active=154/595
+[  53/240] N=10 seed=13 base         success   clear= 0.146 t= 33.1s active=0/0
+[  54/240] N=10 seed=13 modes        success   clear= 0.170 t= 32.6s active=0/0
+[  55/240] N=10 seed=13 blob_extras  success   clear= 0.141 t= 32.1s active=70/642
+[  56/240] N=10 seed=13 blob_pods    success   clear= 0.147 t= 31.5s active=70/630
+[  57/240] N=10 seed=14 base         success   clear= 0.161 t= 29.1s active=0/0
+[  58/240] N=10 seed=14 modes        success   clear= 0.161 t= 29.1s active=0/0
+[  59/240] N=10 seed=14 blob_extras  success   clear= 0.161 t= 29.1s active=0/583
+[  60/240] N=10 seed=14 blob_pods    success   clear= 0.161 t= 29.1s active=0/583
+[  61/240] N=10 seed=15 base         success   clear= 0.186 t= 24.2s active=0/0
+[  62/240] N=10 seed=15 modes        success   clear= 0.111 t= 24.9s active=0/0
+[  63/240] N=10 seed=15 blob_extras  success   clear= 0.154 t= 24.2s active=28/485
+[  64/240] N=10 seed=15 blob_pods    success   clear= 0.198 t= 24.4s active=29/487
+[  65/240] N=10 seed=16 base         success   clear= 0.130 t= 23.1s active=0/0
+[  66/240] N=10 seed=16 modes        success   clear= 0.147 t= 23.4s active=0/0
+[  67/240] N=10 seed=16 blob_extras  success   clear= 0.130 t= 23.1s active=0/463
+[  68/240] N=10 seed=16 blob_pods    success   clear= 0.130 t= 23.1s active=0/463
+[  69/240] N=10 seed=17 base         success   clear= 0.142 t= 34.4s active=0/0
+[  70/240] N=10 seed=17 modes        success   clear= 0.142 t= 34.4s active=0/0
+[  71/240] N=10 seed=17 blob_extras  success   clear= 0.157 t= 26.6s active=89/533
+[  72/240] N=10 seed=17 blob_pods    success   clear= 0.132 t= 26.4s active=96/528
+[  73/240] N=10 seed=18 base         success   clear= 0.206 t= 27.8s active=0/0
+[  74/240] N=10 seed=18 modes        success   clear= 0.208 t= 26.6s active=0/0
+[  75/240] N=10 seed=18 blob_extras  success   clear= 0.161 t= 24.1s active=30/482
+[  76/240] N=10 seed=18 blob_pods    success   clear= 0.167 t= 25.1s active=29/501
+[  77/240] N=10 seed=19 base         success   clear= 0.348 t= 24.9s active=0/0
+[  78/240] N=10 seed=19 modes        success   clear= 0.348 t= 25.1s active=0/0
+[  79/240] N=10 seed=19 blob_extras  success   clear= 0.348 t= 24.9s active=0/498
+[  80/240] N=10 seed=19 blob_pods    success   clear= 0.348 t= 24.9s active=0/498
+[  81/240] N=20 seed= 0 base         success   clear= 0.104 t= 25.6s active=0/0
+[  82/240] N=20 seed= 0 modes        success   clear= 0.100 t= 25.9s active=0/0
+[  83/240] N=20 seed= 0 blob_extras  success   clear= 0.102 t= 25.6s active=2/512
+[  84/240] N=20 seed= 0 blob_pods    success   clear= 0.102 t= 25.6s active=2/512
+[  85/240] N=20 seed= 1 base         success   clear= 0.125 t= 25.2s active=0/0
+[  86/240] N=20 seed= 1 modes        success   clear= 0.140 t= 25.2s active=0/0
+[  87/240] N=20 seed= 1 blob_extras  success   clear= 0.147 t= 25.1s active=10/503
+[  88/240] N=20 seed= 1 blob_pods    success   clear= 0.125 t= 25.2s active=10/505
+[  89/240] N=20 seed= 2 base         timeout   clear= 0.123 t= 60.0s active=0/0
+[  90/240] N=20 seed= 2 modes        collision clear=-0.006 t= 50.5s active=0/0
+[  91/240] N=20 seed= 2 blob_extras  collision clear=-0.004 t= 49.5s active=551/991
+[  92/240] N=20 seed= 2 blob_pods    collision clear=-0.006 t= 50.4s active=666/1008
+[  93/240] N=20 seed= 3 base         success   clear= 0.132 t= 30.7s active=0/0
+[  94/240] N=20 seed= 3 modes        success   clear= 0.099 t= 38.7s active=0/0
+[  95/240] N=20 seed= 3 blob_extras  success   clear= 0.130 t= 31.9s active=143/637
+[  96/240] N=20 seed= 3 blob_pods    success   clear= 0.189 t= 28.9s active=75/577
+[  97/240] N=20 seed= 4 base         timeout   clear= 0.116 t= 60.0s active=0/0
+[  98/240] N=20 seed= 4 modes        timeout   clear= 0.110 t= 60.0s active=0/0
+[  99/240] N=20 seed= 4 blob_extras  timeout   clear= 0.119 t= 60.0s active=342/1200
+[ 100/240] N=20 seed= 4 blob_pods    timeout   clear= 0.125 t= 60.0s active=569/1200
+[ 101/240] N=20 seed= 5 base         success   clear= 0.130 t= 34.0s active=0/0
+[ 102/240] N=20 seed= 5 modes        success   clear= 0.104 t= 36.4s active=0/0
+[ 103/240] N=20 seed= 5 blob_extras  success   clear= 0.160 t= 36.8s active=162/735
+[ 104/240] N=20 seed= 5 blob_pods    success   clear= 0.125 t= 29.9s active=116/597
+[ 105/240] N=20 seed= 6 base         success   clear= 0.049 t= 33.1s active=0/0
+[ 106/240] N=20 seed= 6 modes        success   clear= 0.114 t= 34.9s active=0/0
+[ 107/240] N=20 seed= 6 blob_extras  success   clear= 0.077 t= 41.1s active=198/823
+[ 108/240] N=20 seed= 6 blob_pods    success   clear= 0.123 t= 39.8s active=194/796
+[ 109/240] N=20 seed= 7 base         success   clear= 0.053 t= 35.9s active=0/0
+[ 110/240] N=20 seed= 7 modes        success   clear= 0.052 t= 39.7s active=0/0
+[ 111/240] N=20 seed= 7 blob_extras  success   clear= 0.142 t= 37.6s active=330/753
+[ 112/240] N=20 seed= 7 blob_pods    success   clear= 0.080 t= 35.7s active=337/714
+[ 113/240] N=20 seed= 8 base         success   clear= 0.128 t= 38.3s active=0/0
+[ 114/240] N=20 seed= 8 modes        success   clear= 0.138 t= 40.0s active=0/0
+[ 115/240] N=20 seed= 8 blob_extras  success   clear= 0.136 t= 40.2s active=205/805
+[ 116/240] N=20 seed= 8 blob_pods    success   clear= 0.129 t= 40.2s active=237/804
+[ 117/240] N=20 seed= 9 base         success   clear= 0.187 t= 38.8s active=0/0
+[ 118/240] N=20 seed= 9 modes        success   clear= 0.169 t= 32.5s active=0/0
+[ 119/240] N=20 seed= 9 blob_extras  success   clear= 0.128 t= 39.0s active=159/779
+[ 120/240] N=20 seed= 9 blob_pods    success   clear= 0.138 t= 32.3s active=129/646
+[ 121/240] N=20 seed=10 base         success   clear= 0.084 t= 44.4s active=0/0
+[ 122/240] N=20 seed=10 modes        success   clear= 0.067 t= 44.9s active=0/0
+[ 123/240] N=20 seed=10 blob_extras  success   clear= 0.093 t= 34.4s active=136/687
+[ 124/240] N=20 seed=10 blob_pods    success   clear= 0.142 t= 33.6s active=103/672
+[ 125/240] N=20 seed=11 base         success   clear= 0.054 t= 42.5s active=0/0
+[ 126/240] N=20 seed=11 modes        success   clear= 0.163 t= 42.4s active=0/0
+[ 127/240] N=20 seed=11 blob_extras  success   clear= 0.143 t= 41.8s active=247/835
+[ 128/240] N=20 seed=11 blob_pods    collision clear=-0.005 t= 22.9s active=111/458
+[ 129/240] N=20 seed=12 base         success   clear= 0.124 t= 28.6s active=0/0
+[ 130/240] N=20 seed=12 modes        success   clear= 0.122 t= 27.4s active=0/0
+[ 131/240] N=20 seed=12 blob_extras  success   clear= 0.122 t= 28.4s active=40/567
+[ 132/240] N=20 seed=12 blob_pods    success   clear= 0.148 t= 28.4s active=40/568
+[ 133/240] N=20 seed=13 base         collision clear=-0.005 t= 34.9s active=0/0
+[ 134/240] N=20 seed=13 modes        success   clear= 0.134 t= 34.4s active=0/0
+[ 135/240] N=20 seed=13 blob_extras  success   clear= 0.164 t= 34.6s active=61/693
+[ 136/240] N=20 seed=13 blob_pods    success   clear= 0.136 t= 43.4s active=226/867
+[ 137/240] N=20 seed=14 base         success   clear= 0.206 t= 22.7s active=0/0
+[ 138/240] N=20 seed=14 modes        success   clear= 0.183 t= 22.7s active=0/0
+[ 139/240] N=20 seed=14 blob_extras  success   clear= 0.206 t= 22.7s active=0/454
+[ 140/240] N=20 seed=14 blob_pods    success   clear= 0.206 t= 22.7s active=0/454
+[ 141/240] N=20 seed=15 base         success   clear= 0.100 t= 34.2s active=0/0
+[ 142/240] N=20 seed=15 modes        success   clear= 0.126 t= 40.0s active=0/0
+[ 143/240] N=20 seed=15 blob_extras  success   clear= 0.138 t= 40.0s active=270/800
+[ 144/240] N=20 seed=15 blob_pods    success   clear= 0.109 t= 34.2s active=146/684
+[ 145/240] N=20 seed=16 base         success   clear= 0.114 t= 24.8s active=0/0
+[ 146/240] N=20 seed=16 modes        success   clear= 0.126 t= 24.9s active=0/0
+[ 147/240] N=20 seed=16 blob_extras  success   clear= 0.138 t= 24.6s active=70/493
+[ 148/240] N=20 seed=16 blob_pods    success   clear= 0.150 t= 24.9s active=75/499
+[ 149/240] N=20 seed=17 base         collision clear=-0.016 t= 18.8s active=0/0
+[ 150/240] N=20 seed=17 modes        collision clear=-0.010 t= 19.4s active=0/0
+[ 151/240] N=20 seed=17 blob_extras  collision clear=-0.013 t= 19.4s active=194/387
+[ 152/240] N=20 seed=17 blob_pods    success   clear= 0.106 t= 37.9s active=227/758
+[ 153/240] N=20 seed=18 base         collision clear=-0.004 t= 23.4s active=0/0
+[ 154/240] N=20 seed=18 modes        collision clear=-0.001 t= 24.1s active=0/0
+[ 155/240] N=20 seed=18 blob_extras  collision clear=-0.001 t= 23.6s active=128/473
+[ 156/240] N=20 seed=18 blob_pods    collision clear=-0.008 t= 23.3s active=81/466
+[ 157/240] N=20 seed=19 base         success   clear= 0.119 t= 36.2s active=0/0
+[ 158/240] N=20 seed=19 modes        success   clear= 0.124 t= 36.5s active=0/0
+[ 159/240] N=20 seed=19 blob_extras  collision clear=-0.008 t= 18.5s active=223/370
+[ 160/240] N=20 seed=19 blob_pods    success   clear= 0.122 t= 35.0s active=266/701
+[ 161/240] N=30 seed= 0 base         success   clear= 0.099 t= 57.0s active=0/0
+[ 162/240] N=30 seed= 0 modes        success   clear= 0.132 t= 40.0s active=0/0
+[ 163/240] N=30 seed= 0 blob_extras  success   clear= 0.096 t= 37.3s active=272/746
+[ 164/240] N=30 seed= 0 blob_pods    success   clear= 0.135 t= 40.9s active=288/818
+[ 165/240] N=30 seed= 1 base         collision clear=-0.003 t= 45.1s active=0/0
+[ 166/240] N=30 seed= 1 modes        collision clear=-0.004 t= 47.4s active=0/0
+[ 167/240] N=30 seed= 1 blob_extras  collision clear=-0.017 t= 45.0s active=314/901
+[ 168/240] N=30 seed= 1 blob_pods    collision clear=-0.007 t= 45.0s active=324/899
+[ 169/240] N=30 seed= 2 base         collision clear=-0.007 t= 44.6s active=0/0
+[ 170/240] N=30 seed= 2 modes        collision clear=-0.011 t= 54.1s active=0/0
+[ 171/240] N=30 seed= 2 blob_extras  collision clear=-0.003 t= 36.4s active=316/728
+[ 172/240] N=30 seed= 2 blob_pods    collision clear=-0.003 t= 44.5s active=298/891
+[ 173/240] N=30 seed= 3 base         success   clear= 0.114 t= 36.3s active=0/0
+[ 174/240] N=30 seed= 3 modes        success   clear= 0.181 t= 39.5s active=0/0
+[ 175/240] N=30 seed= 3 blob_extras  success   clear= 0.101 t= 38.9s active=218/778
+[ 176/240] N=30 seed= 3 blob_pods    success   clear= 0.132 t= 35.9s active=116/717
+[ 177/240] N=30 seed= 4 base         success   clear= 0.143 t= 40.0s active=0/0
+[ 178/240] N=30 seed= 4 modes        success   clear= 0.128 t= 39.9s active=0/0
+[ 179/240] N=30 seed= 4 blob_extras  success   clear= 0.099 t= 51.6s active=299/1033
+[ 180/240] N=30 seed= 4 blob_pods    success   clear= 0.129 t= 38.8s active=204/775
+[ 181/240] N=30 seed= 5 base         success   clear= 0.101 t= 33.5s active=0/0
+[ 182/240] N=30 seed= 5 modes        success   clear= 0.047 t= 35.2s active=0/0
+[ 183/240] N=30 seed= 5 blob_extras  success   clear= 0.023 t= 33.4s active=175/668
+[ 184/240] N=30 seed= 5 blob_pods    success   clear= 0.019 t= 34.2s active=168/685
+[ 185/240] N=30 seed= 6 base         success   clear= 0.018 t= 49.1s active=0/0
+[ 186/240] N=30 seed= 6 modes        collision clear=-0.007 t= 14.9s active=0/0
+[ 187/240] N=30 seed= 6 blob_extras  collision clear=-0.008 t= 19.9s active=266/399
+[ 188/240] N=30 seed= 6 blob_pods    collision clear=-0.006 t= 19.8s active=266/395
+[ 189/240] N=30 seed= 7 base         timeout   clear= 0.084 t= 60.0s active=0/0
+[ 190/240] N=30 seed= 7 modes        timeout   clear= 0.121 t= 60.0s active=0/0
+[ 191/240] N=30 seed= 7 blob_extras  timeout   clear= 0.122 t= 60.0s active=608/1200
+[ 192/240] N=30 seed= 7 blob_pods    timeout   clear= 0.129 t= 60.0s active=560/1200
+[ 193/240] N=30 seed= 8 base         collision clear=-0.000 t=  8.0s active=0/0
+[ 194/240] N=30 seed= 8 modes        collision clear=-0.004 t=  7.8s active=0/0
+[ 195/240] N=30 seed= 8 blob_extras  collision clear=-0.008 t=  8.0s active=41/160
+[ 196/240] N=30 seed= 8 blob_pods    collision clear=-0.008 t=  8.1s active=43/161
+[ 197/240] N=30 seed= 9 base         success   clear= 0.038 t= 40.5s active=0/0
+[ 198/240] N=30 seed= 9 modes        success   clear= 0.012 t= 40.8s active=0/0
+[ 199/240] N=30 seed= 9 blob_extras  success   clear= 0.038 t= 41.4s active=349/827
+[ 200/240] N=30 seed= 9 blob_pods    success   clear= 0.004 t= 40.8s active=327/815
+[ 201/240] N=30 seed=10 base         success   clear= 0.068 t= 51.7s active=0/0
+[ 202/240] N=30 seed=10 modes        success   clear= 0.060 t= 49.4s active=0/0
+[ 203/240] N=30 seed=10 blob_extras  success   clear= 0.103 t= 54.4s active=544/1088
+[ 204/240] N=30 seed=10 blob_pods    success   clear= 0.110 t= 49.4s active=432/988
+[ 205/240] N=30 seed=11 base         success   clear= 0.114 t= 35.7s active=0/0
+[ 206/240] N=30 seed=11 modes        success   clear= 0.137 t= 35.6s active=0/0
+[ 207/240] N=30 seed=11 blob_extras  success   clear= 0.131 t= 36.4s active=211/727
+[ 208/240] N=30 seed=11 blob_pods    success   clear= 0.104 t= 35.5s active=191/711
+[ 209/240] N=30 seed=12 base         success   clear= 0.115 t= 40.8s active=0/0
+[ 210/240] N=30 seed=12 modes        success   clear= 0.115 t= 35.5s active=0/0
+[ 211/240] N=30 seed=12 blob_extras  success   clear= 0.114 t= 39.2s active=217/785
+[ 212/240] N=30 seed=12 blob_pods    success   clear= 0.088 t= 39.1s active=209/783
+[ 213/240] N=30 seed=13 base         collision clear=-0.008 t= 17.9s active=0/0
+[ 214/240] N=30 seed=13 modes        success   clear= 0.102 t= 38.0s active=0/0
+[ 215/240] N=30 seed=13 blob_extras  success   clear= 0.102 t= 38.2s active=309/764
+[ 216/240] N=30 seed=13 blob_pods    success   clear= 0.139 t= 38.5s active=291/770
+[ 217/240] N=30 seed=14 base         collision clear=-0.007 t= 36.0s active=0/0
+[ 218/240] N=30 seed=14 modes        timeout   clear= 0.021 t= 60.0s active=0/0
+[ 219/240] N=30 seed=14 blob_extras  success   clear= 0.007 t= 53.2s active=518/1064
+[ 220/240] N=30 seed=14 blob_pods    collision clear=-0.002 t= 37.1s active=503/743
+[ 221/240] N=30 seed=15 base         success   clear= 0.143 t= 36.4s active=0/0
+[ 222/240] N=30 seed=15 modes        success   clear= 0.132 t= 36.6s active=0/0
+[ 223/240] N=30 seed=15 blob_extras  success   clear= 0.156 t= 37.1s active=124/743
+[ 224/240] N=30 seed=15 blob_pods    success   clear= 0.118 t= 36.4s active=122/727
+[ 225/240] N=30 seed=16 base         collision clear=-0.003 t= 17.8s active=0/0
+[ 226/240] N=30 seed=16 modes        success   clear= 0.029 t= 47.0s active=0/0
+[ 227/240] N=30 seed=16 blob_extras  collision clear=-0.004 t= 32.5s active=145/650
+[ 228/240] N=30 seed=16 blob_pods    success   clear= 0.025 t= 34.5s active=157/689
+[ 229/240] N=30 seed=17 base         success   clear= 0.052 t= 50.5s active=0/0
+[ 230/240] N=30 seed=17 modes        success   clear= 0.050 t= 53.1s active=0/0
+[ 231/240] N=30 seed=17 blob_extras  success   clear= 0.114 t= 51.4s active=247/1028
+[ 232/240] N=30 seed=17 blob_pods    success   clear= 0.046 t= 52.2s active=287/1044
+[ 233/240] N=30 seed=18 base         success   clear= 0.154 t= 35.2s active=0/0
+[ 234/240] N=30 seed=18 modes        success   clear= 0.016 t= 48.0s active=0/0
+[ 235/240] N=30 seed=18 blob_extras  collision clear=-0.003 t= 13.8s active=48/275
+[ 236/240] N=30 seed=18 blob_pods    success   clear= 0.067 t= 47.9s active=242/957
+[ 237/240] N=30 seed=19 base         collision clear=-0.001 t= 29.4s active=0/0
+[ 238/240] N=30 seed=19 modes        success   clear= 0.021 t= 41.9s active=0/0
+[ 239/240] N=30 seed=19 blob_extras  collision clear=-0.000 t= 28.6s active=314/572
+[ 240/240] N=30 seed=19 blob_pods    success   clear= 0.101 t= 30.8s active=158/616
+
+wrote /home/saran/robohouse_ws/amoeba_sandbox/artifacts/results/milestones/spacetime_blob_density_panel.csv
+
+  N condition      success  collide  timeout  mean clear  vs base: McNemar p  Wilcoxon p (clear)
+ 10 base           20/20          0        0       0.189                  --                  --
+ 10 modes          20/20          0        0       0.179         1.000 (0/0)               0.211
+ 10 blob_extras    20/20          0        0       0.176         1.000 (0/0)               0.110
+ 10 blob_pods      20/20          0        0       0.178         1.000 (0/0)               0.158
+ 20 base           15/20          3        2       0.096                  --                  --
+ 20 modes          16/20          3        1       0.103       1.000 (1+/0-)               0.869
+ 20 blob_extras    15/20          4        1       0.106       1.000 (1+/1-)               0.107
+ 20 blob_pods      16/20          3        1       0.112       1.000 (2+/1-)               0.157
+ 30 base           12/20          7        1       0.061                  --                  --
+ 30 modes          14/20          4        2       0.064       0.625 (3+/1-)               0.658
+ 30 blob_extras    12/20          7        1       0.058       1.000 (2+/2-)               0.984
+ 30 blob_pods      14/20          5        1       0.066       0.625 (3+/1-)               0.896

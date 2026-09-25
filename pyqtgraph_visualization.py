@@ -11,6 +11,11 @@ from visualization import (
     SPACETIME_DETOUR, SPACETIME_WAIT, STREAM, SURFACE, VIOLET, YELLOW)
 
 
+# Space-time blob overlay (spacetime_blob.py): one colour per route slot, teal for the body rim.
+BLOB_BODY = "#00A6A6"
+BLOB_ROUTE_COLORS = ("#E0308C", "#7B61FF", "#F28E2B")
+
+
 def _hex_rgb(color):
     color = color.lstrip("#")
     return tuple(int(color[index:index + 2], 16) for index in (0, 2, 4))
@@ -49,7 +54,7 @@ class PyQtGraphAnimator:
         self.sample_indices = np.linspace(
             0, ctrl.K - 1, min(sample_count, ctrl.K)).astype(int)
 
-        self.app = pg.mkQApp("Amoeba MPPI")
+        self.app = pg.mkQApp("TG-MPPI")
         self.window = pg.GraphicsLayoutWidget(
             title=f"{ctrl.name} | world {world}")
         self.window.resize(620, 980)
@@ -82,7 +87,7 @@ class PyQtGraphAnimator:
             self.plot.plot(pen=pg.mkPen(
                 (*_hex_rgb(color), 85), width=1))
             for color in (*BRANCH_COLORS, ORANGE, SPACETIME_WAIT,
-                         SPACETIME_DETOUR)
+                         SPACETIME_DETOUR, BLOB_ROUTE_COLORS[0])
         ]
         self.branch_lines = [
             self.plot.plot(pen=pg.mkPen(
@@ -121,16 +126,101 @@ class PyQtGraphAnimator:
         self.plot.addItem(self.robot)
         self.moving_items = []
         if hasattr(env, "moving_obs"):
-            for _ in env.mov_center:
+            obstacle_r = getattr(env, "obstacle_r", CYL_R)
+            for _ in env.moving_obs():
                 item = QtWidgets.QGraphicsEllipseItem(
-                    -CYL_R, -CYL_R, 2 * CYL_R, 2 * CYL_R)
+                    -obstacle_r, -obstacle_r, 2 * obstacle_r, 2 * obstacle_r)
                 item.setPen(pg.mkPen(RED, width=2))
                 item.setBrush(pg.mkBrush(OBSTACLE))
                 item.setZValue(12)
                 self.plot.addItem(item)
                 self.moving_items.append(item)
+        self._make_blob_items()
         self.window.show()
         self.app.processEvents()
+
+    def _make_blob_items(self):
+        """Space-time blob overlay; created only when the controller has a BlobPlanner."""
+        pg = self.pg
+        self.blob = getattr(self.ctrl, "blob", None)
+        if self.blob is None:
+            return
+        # the body's membrane: reachable cells on the last time layer, brighter = lower promise
+        self.blob_rim = pg.ScatterPlotItem(size=5, pen=None)
+        self.blob_rim.setZValue(-5)
+        self.plot.addItem(self.blob_rim)
+        # constant-velocity prediction the flood uses: current position -> position at horizon
+        self.blob_pred = self.plot.plot(pen=pg.mkPen((*_hex_rgb(RED), 120), width=1,
+                                                     style=self.QtCore.Qt.DashLine))
+        self.blob_pred.setZValue(11)
+        # up to 3 routes, one colour each; dots mark the time layers (spacing = speed)
+        self.blob_routes = [self.plot.plot(pen=pg.mkPen(c, width=2)) for c in BLOB_ROUTE_COLORS]
+        self.blob_dots = [pg.ScatterPlotItem(size=5, pen=None, brush=pg.mkBrush(c))
+                          for c in BLOB_ROUTE_COLORS]
+        for line, dots in zip(self.blob_routes, self.blob_dots):
+            line.setZValue(14)
+            dots.setZValue(15)
+            self.plot.addItem(dots)
+        self.blob_label = pg.TextItem(anchor=(0, 0), color=INK)
+        self.blob_label.setZValue(30)
+        self.plot.addItem(self.blob_label)
+
+    def _update_blob(self, state, info):
+        if getattr(self, "blob", None) is None:
+            return
+        snap = self.blob.last
+        for line, dots in zip(self.blob_routes, self.blob_dots):
+            line.setData([], [])
+            dots.setData([], [])
+        if snap is None:
+            self.blob_rim.setData([], [])
+            self.blob_pred.setData([], [])
+            self.blob_label.setText("blob: no obstacles")
+            self.blob_label.setPos(self.env.xmin + 0.1, self.env.ymax - 0.1)
+            return
+        body = snap["body"]
+        # body rim
+        gk = body.G[body.K]
+        ii, jj = np.nonzero(gk < 1.0e8)
+        if len(ii):
+            xy = np.stack([body.X[ii, jj], body.Y[ii, jj]], 1)
+            term = self.ctrl.flow.dist(xy)
+            score = gk[ii, jj] + term
+            span = max(float(np.ptp(score)), 1e-6)
+            rel = 1.0 - (score - score.min()) / span            # 1 = best exit
+            base = np.asarray(_hex_rgb(BLOB_BODY))
+            brushes = [pg_brush for pg_brush in (
+                self.pg.mkBrush(int(base[0]), int(base[1]), int(base[2]), int(25 + 130 * r))
+                for r in rel)]
+            self.blob_rim.setData(pos=xy, brush=brushes)
+        else:
+            self.blob_rim.setData([], [])
+        # predicted obstacle motion over the horizon
+        if len(body.pos):
+            end = body.pos + body.vel * body.horizon
+            seg = [np.array([a, b]) for a, b in zip(body.pos, end)]
+            px, py = _segments_xy(seg)
+            self.blob_pred.setData(px, py)
+        else:
+            self.blob_pred.setData([], [])
+        # routes (colour = slot); the selected mode's route is drawn thick
+        selected = info.get("selected_mode")
+        selected_key = None if selected is None else selected.get("key")
+        rejected = set(snap.get("rejected", []))
+        for slot, (bid, path) in enumerate(snap["chosen"][:3]):
+            width = 4 if bid == selected_key else 2
+            style = self.QtCore.Qt.DotLine if bid in rejected else self.QtCore.Qt.SolidLine
+            self.blob_routes[slot].setPen(self.pg.mkPen(
+                BLOB_ROUTE_COLORS[slot], width=width, style=style))
+            self.blob_routes[slot].setData(path[:, 0], path[:, 1])
+            self.blob_dots[slot].setData(pos=path)
+        status = "ACTIVE" if snap["active"] else "idle"
+        mode = self.blob.mode
+        self.blob_label.setText(
+            f"space-time blob [{mode}] {status}\n"
+            f"obstacles cost {snap['delay']:.2f} m | classes {body.classes_found} | "
+            f"build {body.build_ms:.0f} ms")
+        self.blob_label.setPos(self.env.xmin + 0.1, self.env.ymax - 0.1)
 
     def _circle(self, xy, radius, fill, edge=INK, width=1, z=5):
         item = self.QtWidgets.QGraphicsEllipseItem(
@@ -210,7 +300,9 @@ class PyQtGraphAnimator:
             global_peak = float(sampled_weights.max(initial=0.0))
             for index in np.unique(sampled_labels):
                 key = key_by_index.get(int(index), -1)
-                if key >= 200:
+                if key >= 1000:
+                    role = 6              # space-time blob mode (ids 1000+ / 2000+)
+                elif key >= 200:
                     role = 5
                 elif key >= 100:
                     role = 4
@@ -233,7 +325,7 @@ class PyQtGraphAnimator:
                 strength = role_strength[role]
                 alpha = int(45 + 150 * np.clip(strength, 0.0, 1.0))
                 role_colors = (*BRANCH_COLORS, ORANGE, SPACETIME_WAIT,
-                              SPACETIME_DETOUR)
+                              SPACETIME_DETOUR, BLOB_ROUTE_COLORS[0])
                 color = role_colors[role]
                 self.fan_curves[role].setPen(
                     self.pg.mkPen((*_hex_rgb(color), alpha), width=1))
@@ -254,7 +346,7 @@ class PyQtGraphAnimator:
             if 100 <= proposal.branch_id < 200:
                 self.spacetime_wait_line.setData(
                     proposal.rollout[:, 0], proposal.rollout[:, 1])
-            elif proposal.branch_id >= 200:
+            elif 200 <= proposal.branch_id < 1000:
                 self.spacetime_detour_line.setData(
                     proposal.rollout[:, 0], proposal.rollout[:, 1])
 
@@ -276,6 +368,7 @@ class PyQtGraphAnimator:
         if self.moving_items:
             for item, xy in zip(self.moving_items, self.env.moving_obs()):
                 item.setPos(float(xy[0]), float(xy[1]))
+        self._update_blob(state, info)
         selected = info.get("selected_mode")
         mode = "" if selected is None else (
             f" | {selected['name']} ({info.get('selection_reason', '')})")
