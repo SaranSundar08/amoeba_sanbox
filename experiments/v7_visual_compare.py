@@ -142,10 +142,10 @@ def main():
                          args.horizon, "slip", False, 2.0, 0.03)
              for name, env, path in zip(names, envs, paths)]
     labels = (("Path-cost MPPI" if args.baseline == "path_mppi" else
-               "Single-path Biased MPPI"), "Geodesic Amoeba MPPI")
+               "Single-path Biased MPPI"), "Geodesic TG-MPPI")
     pg.setConfigOption("background", "#fcfcfb")
     pg.setConfigOption("foreground", "#343330")
-    app = pg.mkQApp("Path MPPI versus Amoeba MPPI")
+    app = pg.mkQApp("Path MPPI versus TG-MPPI")
     window = pg.GraphicsLayoutWidget(
         title=f"World {args.world}: matched MPPI comparison")
     window.resize(1500, 850)

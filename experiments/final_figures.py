@@ -20,7 +20,7 @@ ROOT = "artifacts/results/milestones"
 OUT = "artifacts/images/experiments/final"
 ORDER = ("vanilla", "path_mppi", "path_biased", "amoeba")
 LABEL = {"vanilla": "Vanilla\nMPPI", "path_mppi": "Path-cost\nMPPI",
-         "path_biased": "Single-path\nBiased MPPI", "amoeba": "Amoeba\nMPPI"}
+         "path_biased": "Single-path\nBiased MPPI", "amoeba": "TG-MPPI"}
 COLOR = {"vanilla": "#777777", "path_mppi": "#4a3aa7",
          "path_biased": "#e28b20", "amoeba": "#168b8f"}
 
@@ -111,7 +111,7 @@ def blocked_figure(out):
     amoeba = [r for r in split if r["config"] == "amoeba"] + [
         r for r in extension if r["config"] == "amoeba"]
     groups = (flow, amoeba)
-    names = ("Flow only", "Full Amoeba")
+    names = ("Flow only", "Full TG-MPPI")
     colors = ("#4a3aa7", "#168b8f")
     success = [sum(int(r["success"]) for r in rows) for rows in groups]
     peer = [np.mean([_f(r, "minimum_peer_clearance_m") for r in rows])
