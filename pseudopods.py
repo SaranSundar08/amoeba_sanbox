@@ -99,14 +99,37 @@ def _topologically_distinct(field, a, b, separation):
     return False
 
 
+def _sector(field, robot_yaw, endpoint):
+    """'front' if within +-90 deg of robot_yaw, else 'rear' (robot-relative,
+    not world-frame -- "behind" means behind the robot's own heading)."""
+    rx = field.x0 + field.center_ij[0] * field.res
+    ry = field.y0 + field.center_ij[1] * field.res
+    bearing = np.arctan2(endpoint[1] - ry, endpoint[0] - rx)
+    rel = np.arctan2(np.sin(bearing - robot_yaw), np.cos(bearing - robot_yaw))
+    return "front" if abs(rel) <= np.pi / 2 else "rear"
+
+
 def extract_pseudopods(field, max_modes=3, endpoint_spacing=0.35,
-                       branch_separation=0.45, score_slack=3.0):
+                       branch_separation=0.45, score_slack=3.0,
+                       robot_yaw=None):
     """Extract up to ``max_modes`` distinct promising membrane branches.
 
     Candidates are ranked by local travel distance plus the membrane's
     navigation promise. Spatial non-maximum suppression removes neighboring
     frontier cells, and a dry-space separator test removes geometrically
     equivalent paths through the same open region.
+
+    Ranking alone is forward-biased: promise rewards proximity to the
+    global path's continuation, which is normally ahead of the robot, so a
+    genuinely reachable exit behind it can lose out to several mediocre
+    forward exits before the ranking ever reaches it -- even though the
+    body is flooded in every direction and the membrane exists all the way
+    around the robot. When ``robot_yaw`` is given (and ``max_modes >= 2``),
+    one slot is reserved for the best rear-sector (robot-relative) exit if
+    one is topologically distinct and reachable; if none exists, the
+    unmodified ranked selection is used exactly as before. ``robot_yaw``
+    defaults to ``None``, reproducing the prior forward-only-in-practice
+    behavior bit-for-bit for any caller that doesn't pass it.
     """
     if max_modes < 1:
         return []
@@ -145,6 +168,28 @@ def extract_pseudopods(field, max_modes=3, endpoint_spacing=0.35,
         selected.append(Pseudopod(endpoint, path, score))
         if len(selected) == max_modes:
             break
+
+    reserve_rear = robot_yaw is not None and max_modes >= 2
+    if (reserve_rear and selected
+            and not any(_sector(field, robot_yaw, p.endpoint) == "rear"
+                        for p in selected)):
+        kept = selected[:-1]   # drop the lowest-ranked (last-added) pick
+        for cell, endpoint, score in candidates:
+            if _sector(field, robot_yaw, endpoint) != "rear":
+                continue
+            if any(np.array_equal(endpoint, p.endpoint) for p in selected):
+                continue
+            path = _trace_to_center(field, cell)
+            if len(path) < 2:
+                continue
+            if kept and not all(
+                    _topologically_distinct(
+                        field, path, old.centerline, branch_separation)
+                    for old in kept):
+                continue
+            selected = kept + [Pseudopod(endpoint, path, score)]
+            break
+
     return selected
 
 
